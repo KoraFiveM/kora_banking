@@ -1,5 +1,6 @@
 Config = {
-    useTarget = GetConvar('UseTarget', 'false') == 'true',
+    useTarget = true,
+    -- useTarget = GetConvar('UseTarget', 'false') == 'true',
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm' },
     useDailyLimit = true,
     dailyLimit = 5000,
