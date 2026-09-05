@@ -1,7 +1,8 @@
 Config = {
-    useTarget = true,
-    -- useTarget = GetConvar('UseTarget', 'false') == 'true',
+    ui = { accent = nil },
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm' },
+    atmDistance = 1.8,
+    atmAccessTime = 1500,
     useDailyLimit = true,
     dailyLimit = 5000,
     maxAccounts = 2,

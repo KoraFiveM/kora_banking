@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `bank_statements` (
   `amount` int(11) DEFAULT NULL,
   `reason` varchar(50) DEFAULT NULL,
   `statement_type` enum('deposit','withdraw') DEFAULT NULL,
-  `date` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `date` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`) USING BTREE,
   KEY `citizenid` (`citizenid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

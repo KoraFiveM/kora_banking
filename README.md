@@ -1,13 +1,28 @@
-# QB-Banking
+# qbbanking
 
 ## Features
-- Handles all player interaction with bank/job/gang/shared accounts
-- ATM and bank card integration
-- Shared accounts between players
-- Auto creation of job/gang accounts on bank first open
-- Boss-only access to job/gang accounts
+- React banking interface using qblib's shared theme tokens
+- Clearly separated personal, society, gang, and shared balances
+- Full branch services: cash, transfers, transaction history, shared accounts, and bank cards
+- Compact ATM interface with server-side PIN checks and attempt throttling
+- Targetable world ATMs with card animation, owner-bound cards, proximity checks, and configurable daily limits
+- qblib callbacks, notifications, interactions, and theme integration
+- qbcore flat exports for players, money, inventory, commands, jobs, and gangs
+- Compatible `AddMoney`, `RemoveMoney`, and account exports for job resources
 
-Documentation: https://docs.qbcore.org/qbcore-documentation/qbcore-resources/qb-banking
+## Requirements
+
+- `qblib`
+- `qbsql`
+- `qbcore`
+- `qbtarget`
+- `qbinventory`
+
+Run `pnpm install` and `pnpm build` from `web/` after changing the interface.
+
+ATMs are available on the models in `Config.atmModels`. Players can order a bank card and choose its PIN at a branch, then target an ATM or use the card while standing beside one. `Config.atmDistance`, `Config.atmAccessTime`, `Config.useDailyLimit`, and `Config.dailyLimit` control the ATM flow.
+
+The resource name is `qbbanking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
 
 # License
 
