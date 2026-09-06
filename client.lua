@@ -125,17 +125,19 @@ for index, coords in ipairs(Config.locations) do
     }, false)
 end
 
--- Register the four stock GTA ATM props from Config.atmModels as one model
--- target, so every streamed ATM variant shares the same option.
+-- Register directly with qbtarget. ATM props stream in and out with the map,
+-- so this must be a model target rather than an entity snapshot. Going through
+-- QB.interact here also adds an unnecessary availability wrapper; registering
+-- the native target option keeps every streamed ATM discoverable.
 local atmTargetId
 
 local function registerAtmTargets()
-    if atmTargetId then pcall(function() QB.interact.removeModel(Config.atmModels, atmTargetId) end) end
-    atmTargetId = QB.interact.addModel(Config.atmModels, {
+    if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
+    atmTargetId = exports.qbtarget:addModel(Config.atmModels, {
         {
             icon = 'credit-card',
             label = 'Use ATM',
-            action = accessAtm,
+            onSelect = accessAtm,
         },
     }, Config.atmDistance)
 end
@@ -198,5 +200,5 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
     setFocus(false)
     for index in ipairs(Config.locations) do pcall(function() QB.interact.removeZone(('qbbanking:branch:%d'):format(index)) end) end
-    if atmTargetId then pcall(function() QB.interact.removeModel(Config.atmModels, atmTargetId) end) end
+    if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
 end)
