@@ -417,14 +417,14 @@ local function openBanking(src, mode, location)
     return snapshot(src, mode, true)
 end
 
-QB.callback.register('qbbanking:open', function(src, mode, location)
+local function openCallback(src, mode, location)
     local ok, result, err = pcall(openBanking, src, mode, location)
     if ok then return result, err end
     print(('^1[qbbanking]^7 open failed for %s: %s'):format(src, tostring(result)))
     return nil, 'The bank encountered an internal error.'
-end)
+end
 
-QB.callback.register('qbbanking:pin', function(src, pin)
+local function pinCallback(src, pin)
     local current = activeSession(src)
     if not current or current.mode ~= 'atm' then return nil, 'Open an ATM first.' end
     if current.lockedUntil and current.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
@@ -440,9 +440,9 @@ QB.callback.register('qbbanking:pin', function(src, pin)
     end
     current.unlocked = true
     return snapshot(src, 'atm', true)
-end)
+end
 
-QB.callback.register('qbbanking:action', function(src, payload)
+local function actionCallback(src, payload)
     if type(payload) ~= 'table' then return nil, 'Invalid request.' end
     local current = activeSession(src)
     if not current or not current.unlocked then return nil, 'Your banking session expired.' end
@@ -460,8 +460,44 @@ QB.callback.register('qbbanking:action', function(src, payload)
         return nil, 'That action is not available at an ATM.'
     end
     if not message then return nil, actionErr end
-    local fresh = snapshot(src, current.mode, true)
-    return { message = message, snapshot = fresh }
+    return { message = message, snapshot = snapshot(src, current.mode, true) }
+end
+
+local function registerCallbacks()
+    QB.callback.register('qbbanking:open', openCallback)
+    QB.callback.register('qbbanking:pin', pinCallback)
+    QB.callback.register('qbbanking:action', actionCallback)
+end
+
+registerCallbacks()
+
+-- Banking's own request channel is deliberately independent from qblib's
+-- callback registry. A live qblib reload must not make open/PIN/action
+-- requests disappear while qbbanking itself remains running.
+RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
+    local src = source
+    if type(requestId) ~= 'number' or requestId % 1 ~= 0 or requestId < 1 then return end
+
+    local handler = operation == 'open' and openCallback
+        or operation == 'pin' and pinCallback
+        or operation == 'action' and actionCallback
+    if not handler then
+        return TriggerClientEvent('qbbanking:client:response', src, requestId, nil, 'Invalid banking request.')
+    end
+
+    local ok, result, err = pcall(handler, src, ...)
+    if not ok then
+        print(('^1[qbbanking]^7 %s request failed for %s: %s'):format(operation, src, tostring(result)))
+        return TriggerClientEvent('qbbanking:client:response', src, requestId, nil, 'The bank encountered an internal error.')
+    end
+    TriggerClientEvent('qbbanking:client:response', src, requestId, result, err)
+end)
+
+-- qblib owns callback registrations. Reinstall ours after a live qblib
+-- restart so bank and ATM requests never point at a cleared registry.
+AddEventHandler('onResourceStart', function(resource)
+    if resource ~= 'qblib' then return end
+    SetTimeout(0, registerCallbacks)
 end)
 
 local function CreatePlayerAccount(playerId, accountName, accountBalance, accountUsers)

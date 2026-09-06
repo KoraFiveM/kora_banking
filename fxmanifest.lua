@@ -9,6 +9,7 @@ description 'Personal, shared, society and gang banking for qbcore'
 
 provide 'qb-banking'
 
+dependency 'qbtheme'
 dependency 'qblib'
 dependency 'qbsql'
 dependency 'qbcore'
@@ -22,7 +23,10 @@ shared_scripts {
     'config.lua',
 }
 
-client_script 'client.lua'
+client_scripts {
+    '@qbtheme/client/bridge.lua',
+    'client.lua',
+}
 
 server_script 'server.lua'
 

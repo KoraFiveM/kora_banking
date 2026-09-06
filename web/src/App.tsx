@@ -8,20 +8,6 @@ import { Account, fetchNui, money, relativeDate, Snapshot } from "./lib"
 type View = "activity" | "cash" | "transfer" | "manage"
 type NuiResult = { ok: boolean; error?: string; result?: { message: string; snapshot: Snapshot }; snapshot?: Snapshot }
 
-function ThemeSync() {
-  useEffect(() => {
-    const listener = (event: MessageEvent<{ action?: string; data?: Record<string, string> }>) => {
-      if (event.data?.action !== "qbbanking:theme" || !event.data.data) return
-      for (const [key, value] of Object.entries(event.data.data)) {
-        if (typeof value === "string") document.documentElement.style.setProperty(`--${key}`, value)
-      }
-    }
-    window.addEventListener("message", listener)
-    return () => window.removeEventListener("message", listener)
-  }, [])
-  return null
-}
-
 function AccountIcon({ type }: { type: Account["type"] }) {
   const Icon = type === "checking" ? UserRound : type === "job" ? Building2 : type === "gang" ? ShieldCheck : Users
   return <Icon className="h-4 w-4" aria-hidden />
@@ -228,5 +214,5 @@ export default function App() {
     if (response.ok && response.result) { setSnapshot(response.result.snapshot); return true }
     return false
   }
-  return <><ThemeSync /><div className="flex h-full w-full items-center justify-center">{snapshot && (snapshot.locked ? <PinScreen snapshot={snapshot} close={close} unlock={setSnapshot} /> : snapshot.mode === "atm" ? <ATM snapshot={snapshot} close={close} run={runAtm} /> : <Bank snapshot={snapshot} close={close} update={setSnapshot} />)}</div></>
+  return <div className="flex h-full w-full items-center justify-center">{snapshot && (snapshot.locked ? <PinScreen snapshot={snapshot} close={close} unlock={setSnapshot} /> : snapshot.mode === "atm" ? <ATM snapshot={snapshot} close={close} run={runAtm} /> : <Bank snapshot={snapshot} close={close} update={setSnapshot} />)}</div>
 }

@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
+import qbtheme from "../../qbtheme/vite-plugin.mjs"
 
-export default defineConfig({ plugins: [react()], base: "./", build: { outDir: "build", emptyOutDir: true } })
+export default defineConfig({ plugins: [qbtheme(), react()], base: "./", build: { outDir: "build", emptyOutDir: true } })

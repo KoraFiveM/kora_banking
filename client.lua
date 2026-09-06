@@ -3,6 +3,10 @@ local ready = false
 local pending = {}
 local focused = false
 local openingAtm = false
+local nextRequestId = 0
+local pendingRequests = {}
+
+local REQUEST_TIMEOUT = 10000
 
 local function send(action, data)
     if not ready then
@@ -22,20 +26,40 @@ local function notify(message, kind)
     QB.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
 end
 
-local function request(name, ...)
-    local result, err = QB.callback.trigger(name, ...)
-    if result == nil and err == nil then return nil, 'The bank did not answer. Try again.' end
-    return result, err
+local function request(operation, ...)
+    nextRequestId = nextRequestId + 1
+    if nextRequestId > 2147483647 then nextRequestId = 1 end
+
+    local requestId = nextRequestId
+    local response = promise.new()
+    pendingRequests[requestId] = response
+    TriggerServerEvent('qbbanking:server:request', requestId, operation, ...)
+
+    SetTimeout(REQUEST_TIMEOUT, function()
+        if pendingRequests[requestId] ~= response then return end
+        pendingRequests[requestId] = nil
+        response:resolve({ error = 'The bank did not answer. Try again.' })
+    end)
+
+    local reply = Citizen.Await(response)
+    if type(reply) ~= 'table' then return nil, 'The bank did not answer. Try again.' end
+    return reply.result, reply.error
 end
 
+RegisterNetEvent('qbbanking:client:response', function(requestId, result, err)
+    local response = pendingRequests[requestId]
+    if not response then return end
+    pendingRequests[requestId] = nil
+    response:resolve({ result = result, error = err })
+end)
+
 local function pushTheme()
-    local ok, tokens = pcall(function() return QB.theme.tokens(Config.ui and Config.ui.accent or nil) end)
-    if ok and type(tokens) == 'table' then send('qbbanking:theme', tokens) end
+    QBTheme.apply(Config.ui and Config.ui.accent or nil)
 end
 
 local function open(mode, location)
     CreateThread(function()
-        local snapshot, err = request('qbbanking:open', mode, location)
+        local snapshot, err = request('open', mode, location)
         if not snapshot then return notify(err or 'You cannot access banking here.') end
         setFocus(true)
         pushTheme()
@@ -101,21 +125,19 @@ for index, coords in ipairs(Config.locations) do
     }, false)
 end
 
-local atmTargets = {}
+-- Register the four stock GTA ATM props from Config.atmModels as one model
+-- target, so every streamed ATM variant shares the same option.
+local atmTargetId
 
 local function registerAtmTargets()
-    for model, id in pairs(atmTargets) do pcall(function() QB.interact.removeModel(model, id) end) end
-    atmTargets = {}
-    for _, model in ipairs(Config.atmModels) do
-        atmTargets[model] = QB.interact.addModel(model, {
-            {
-                icon = 'credit-card',
-                label = 'Use ATM',
-                item = 'bank_card',
-                action = accessAtm,
-            },
-        }, Config.atmDistance)
-    end
+    if atmTargetId then pcall(function() QB.interact.removeModel(Config.atmModels, atmTargetId) end) end
+    atmTargetId = QB.interact.addModel(Config.atmModels, {
+        {
+            icon = 'credit-card',
+            label = 'Use ATM',
+            action = accessAtm,
+        },
+    }, Config.atmDistance)
 end
 
 registerAtmTargets()
@@ -158,12 +180,12 @@ RegisterNUICallback('qbbanking:close', function(_, cb)
 end)
 
 RegisterNUICallback('qbbanking:pin', function(data, cb)
-    local snapshot, err = request('qbbanking:pin', data and data.pin)
+    local snapshot, err = request('pin', data and data.pin)
     cb(snapshot and { ok = true, snapshot = snapshot } or { ok = false, error = err or 'Incorrect PIN.' })
 end)
 
 RegisterNUICallback('qbbanking:action', function(data, cb)
-    local result, err = request('qbbanking:action', data)
+    local result, err = request('action', data)
     cb(result and { ok = true, result = result } or { ok = false, error = err or 'The transaction was declined.' })
     if result and result.message then
         notify(result.message, 'success')
@@ -176,5 +198,5 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
     setFocus(false)
     for index in ipairs(Config.locations) do pcall(function() QB.interact.removeZone(('qbbanking:branch:%d'):format(index)) end) end
-    for model, id in pairs(atmTargets) do pcall(function() QB.interact.removeModel(model, id) end) end
+    if atmTargetId then pcall(function() QB.interact.removeModel(Config.atmModels, atmTargetId) end) end
 end)

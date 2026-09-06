@@ -1,12 +1,12 @@
 # qbbanking
 
 ## Features
-- React banking interface using qblib's shared theme tokens
+- React banking interface using qbtheme's shared design tokens
 - Clearly separated personal, society, gang, and shared balances
 - Full branch services: cash, transfers, transaction history, shared accounts, and bank cards
 - Compact ATM interface with server-side PIN checks and attempt throttling
 - Targetable world ATMs with card animation, owner-bound cards, proximity checks, and configurable daily limits
-- qblib callbacks, notifications, interactions, and theme integration
+- qblib callbacks, notifications and interactions, with qbtheme integration
 - qbcore flat exports for players, money, inventory, commands, jobs, and gangs
 - Compatible `AddMoney`, `RemoveMoney`, and account exports for job resources
 
