@@ -6,6 +6,9 @@ Config = {
     useDailyLimit = true,
     dailyLimit = 5000,
     maxAccounts = 2,
+    maxSharedMembers = 10,
+    maxSharedMemberBytes = 512,
+    memberRateLimit = { max = 5, window = 10000 },
     blipInfo = {
         name = 'Bank',
         sprite = 108,

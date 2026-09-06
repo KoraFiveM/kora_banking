@@ -1,5 +1,6 @@
 local Accounts = {}
 local Sessions = {}
+local MemberRequests = {}
 local ready = false
 
 if not QB.shared.get('items', 'bank_card') then
@@ -20,7 +21,7 @@ end
 
 local function roundAmount(value)
     local amount = tonumber(value)
-    if not amount or amount ~= amount or amount == math.huge or amount == -math.huge then return nil end
+    if not QB.util.isFiniteNumber(amount) then return nil end
     amount = math.floor(amount)
     if amount <= 0 or amount > 1000000000 then return nil end
     return amount
@@ -43,11 +44,45 @@ local function boss(record)
     return record and (record.isboss == true or (record.grade and record.grade.isboss == true))
 end
 
+local function boundedUsers(value)
+    if type(value) == 'string' then
+        if #value > Config.maxSharedMemberBytes then return {} end
+        local ok, decoded = pcall(json.decode, value)
+        value = ok and decoded or nil
+    end
+    if type(value) ~= 'table' then return {} end
+
+    local result, seen = {}, {}
+    for _, citizenid in ipairs(value) do
+        if type(citizenid) == 'string' and #citizenid <= 16 and not seen[citizenid] then
+            result[#result + 1] = citizenid
+            seen[citizenid] = true
+            if #result >= Config.maxSharedMembers then break end
+        end
+    end
+    return result
+end
+
 local function users(account)
-    if type(account.users) == 'table' then return account.users end
-    if type(account.users) ~= 'string' then return {} end
-    local ok, decoded = pcall(json.decode, account.users)
-    return ok and type(decoded) == 'table' and decoded or {}
+    return boundedUsers(account.users)
+end
+
+local function consumeMemberRequest(src)
+    local limit = Config.memberRateLimit
+    local current = GetGameTimer()
+    local cutoff = current - limit.window
+    local bucket = MemberRequests[src] or {}
+    local retained = {}
+    for i = 1, #bucket do
+        if bucket[i] > cutoff then retained[#retained + 1] = bucket[i] end
+    end
+    if #retained >= limit.max then
+        MemberRequests[src] = retained
+        return false
+    end
+    retained[#retained + 1] = current
+    MemberRequests[src] = retained
+    return true
 end
 
 local function isMember(account, citizenid)
@@ -94,6 +129,10 @@ end
 
 local function createAccount(name, balance, kind, citizenid, memberJson)
     if Accounts[name] then return false end
+    if kind == 'shared' then
+        memberJson = json.encode(boundedUsers(memberJson))
+        if #memberJson > Config.maxSharedMemberBytes then return false end
+    end
     local id = QB.sql.insert(
         'INSERT INTO bank_accounts (citizenid, account_name, account_balance, account_type, users) VALUES (?, ?, ?, ?, ?)',
         { citizenid, name, balance or 0, kind, memberJson or '[]' }
@@ -381,6 +420,7 @@ local function manage(src, data, payload)
         Accounts[account.account_name] = nil
         return 'Shared account closed.'
     elseif payload.kind == 'addMember' or payload.kind == 'removeMember' then
+        if not consumeMemberRequest(src) then return nil, 'Wait before changing account access again.' end
         local citizenid = cleanText(payload.citizenid, nil, 16)
         if not citizenid then return nil, 'Enter a citizen ID.' end
         local list, found = users(account), false
@@ -392,9 +432,16 @@ local function manage(src, data, payload)
         end
         if payload.kind == 'addMember' then
             if found then return nil, 'That person already has access.' end
+            if #list >= Config.maxSharedMembers then
+                return nil, ('Shared accounts support up to %d members.'):format(Config.maxSharedMembers)
+            end
+            if not QB.sql.scalar('SELECT citizenid FROM players WHERE citizenid = ? LIMIT 1', { citizenid }) then
+                return nil, 'No character has that citizen ID.'
+            end
             list[#list + 1] = citizenid
         elseif not found then return nil, 'That person does not have access.' end
         local encoded = json.encode(list)
+        if #encoded > Config.maxSharedMemberBytes then return nil, 'The account access list is too large.' end
         local changed = QB.sql.update('UPDATE bank_accounts SET users = ? WHERE account_name = ? AND citizenid = ?', { encoded, account.account_name, data.citizenid })
         if not changed or changed < 1 then return nil, 'Account access could not be updated.' end
         account.users = encoded
@@ -558,8 +605,11 @@ exports.qbcore:addCommand('givecash', 'Give nearby player cash', {
     QB.notify.send(target, { title = 'Banking', message = ('Received $%d.'):format(amount), type = 'success' })
 end)
 
-AddEventHandler('playerDropped', function() Sessions[source] = nil end)
 RegisterNetEvent('qbbanking:close', function() Sessions[source] = nil end)
+AddEventHandler('playerDropped', function()
+    Sessions[source] = nil
+    MemberRequests[source] = nil
+end)
 
 CreateThread(function()
     local available, readyErr = QB.sql.ready(60000)
