@@ -30,7 +30,7 @@ local Translations = {
     }
 }
 
-Lang = Lang or Locale:new({
-    phrases = Translations,
-    warnOnMissing = true
-})
+Lang = Lang or Locale:new({ warnOnMissing = true })
+Lang:addLocale('en', Translations)
+
+return Translations
