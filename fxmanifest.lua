@@ -9,6 +9,9 @@ description 'Personal, shared, society and gang banking for qbcore'
 
 provide 'qb-banking'
 
+-- Banking renders through qblib's headless AppShell, whose frame consumes the
+-- shared palette. Keep the provider ordered before this resource even though
+-- banking no longer owns a private NUI page or imports the bridge itself.
 dependency 'qbtheme'
 dependency 'qblib'
 dependency 'qbsql'
@@ -24,16 +27,11 @@ shared_scripts {
 }
 
 client_scripts {
-    '@qbtheme/client/bridge.lua',
     'client.lua',
 }
 
 server_script 'server.lua'
 
-ui_page 'web/build/index.html'
-
 files {
     'banking.sql',
-    'web/build/index.html',
-    'web/build/assets/**/*',
 }

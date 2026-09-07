@@ -1,31 +1,24 @@
+-- Banking presentation through qblib's shared AppShell. The server remains
+-- the authority for every balance, card, proximity and account-access check.
+-- qblib owns the browser frame and focus lifecycle.
+
 local RESOURCE = GetCurrentResourceName()
-local ready = false
-local pending = {}
-local focused = false
+local APP_ID = 'qbbanking:bank'
+local REQUEST_TIMEOUT = 10000
+
 local openingAtm = false
 local nextRequestId = 0
 local pendingRequests = {}
-
-local REQUEST_TIMEOUT = 10000
-
-local function send(action, data)
-    if not ready then
-        pending[#pending + 1] = { action = action, data = data }
-        return
-    end
-    SendNUIMessage({ action = action, data = data })
-end
-
-local function setFocus(value)
-    if focused == value then return end
-    focused = value
-    SetNuiFocus(value, value)
-end
+local currentSnapshot
+local selectedAccount = 'checking'
+local appOpen = false
 
 local function notify(message, kind)
     QB.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
 end
 
+-- Keep banking's request transport independent from qblib's callback
+-- registry, so a live qblib restart cannot strand a banking session.
 local function request(operation, ...)
     nextRequestId = nextRequestId + 1
     if nextRequestId > 2147483647 then nextRequestId = 1 end
@@ -53,24 +46,409 @@ RegisterNetEvent('qbbanking:client:response', function(requestId, result, err)
     response:resolve({ result = result, error = err })
 end)
 
-local function pushTheme()
-    QBTheme.apply(Config.ui and Config.ui.accent or nil)
+local function money(value)
+    return ('$%s'):format(math.floor(tonumber(value) or 0))
+end
+
+local function accountByName(name)
+    for _, account in ipairs((currentSnapshot and currentSnapshot.accounts) or {}) do
+        if account.name == name then return account end
+    end
+end
+
+local function accountOptions(accounts)
+    local options = {}
+    for _, account in ipairs(accounts or {}) do
+        options[#options + 1] = {
+            value = account.name,
+            label = ('%s — %s'):format(account.owner or account.label or account.name, money(account.balance)),
+        }
+    end
+    return options
+end
+
+local function managedAccountOptions(accounts)
+    local options = {}
+    for _, account in ipairs(accounts or {}) do
+        if account.type == 'shared' and account.canManage then
+            options[#options + 1] = { value = account.name, label = account.owner or account.name }
+        end
+    end
+    return options
+end
+
+local function amountPresets()
+    return {
+        { label = '$50', value = 50 }, { label = '$100', value = 100 },
+        { label = '$250', value = 250 }, { label = '$500', value = 500 },
+    }
+end
+
+local function activityRows()
+    local transactions = currentSnapshot and currentSnapshot.transactions and currentSnapshot.transactions[selectedAccount] or {}
+    local rows = {}
+    for _, transaction in ipairs(transactions) do
+        local deposit = transaction.statement_type == 'deposit'
+        rows[#rows + 1] = {
+            id = transaction.id,
+            type = { label = deposit and 'Deposit' or 'Withdrawal', badge = true, tone = deposit and 'success' or 'neutral' },
+            amount = { label = (deposit and '+' or '-') .. money(transaction.amount), tone = deposit and 'success' or 'neutral' },
+            reason = transaction.reason or (deposit and 'Deposit' or 'Withdrawal'),
+            date = tostring(transaction.date or 'Recently'),
+        }
+    end
+    return rows
+end
+
+local function appDefinition()
+    local snapshot = currentSnapshot or { accounts = {}, profile = {} }
+    local accounts = snapshot.accounts or {}
+    local selected = accountByName(selectedAccount) or accounts[1]
+    if selected then selectedAccount = selected.name end
+
+    if snapshot.locked then
+        return {
+            id = APP_ID, title = 'QBCore ATM', description = 'Secure cash access', icon = 'dollar-sign',
+            accent = type(Config.ui.accent) == 'string' and Config.ui.accent or nil,
+            layout = 'compact', width = 460, height = 700,
+            navigation = {
+                {
+                    id = 'unlock', label = 'Verify card', icon = 'credit-card',
+                    content = {
+                        title = 'Enter your bank-card PIN',
+                        description = 'Your PIN is checked only by the banking server.',
+                        blocks = {
+                            { type = 'text', title = 'Card required', text = 'Use a bank card issued to this character. Repeated incorrect PINs are temporarily locked.' },
+                            { type = 'form', id = 'atm-pin', title = 'Secure keypad', fields = {
+                                { id = 'pin', label = '4-digit PIN', type = 'password', required = true,
+                                    minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true,
+                                    description = 'Four digits; never shared with the client resource after verification.' },
+                            }, action = { id = 'banking:unlock', label = 'Unlock ATM', icon = 'key', variant = 'primary' } },
+                        },
+                    },
+                },
+            },
+            footer = 'ATM sessions are secured by the banking server.',
+        }
+    end
+
+    local accountSelect = accountOptions(accounts)
+    local managedAccounts = managedAccountOptions(accounts)
+    local accountItems = {}
+    for _, account in ipairs(accounts) do
+        accountItems[#accountItems + 1] = {
+            id = account.name, label = account.owner or account.label or account.name,
+            description = ('%s · %s'):format(account.label or 'Bank account', account.name), badge = money(account.balance),
+            icon = account.type == 'checking' and 'wallet' or account.type == 'job' and 'briefcase' or account.type == 'gang' and 'shield' or 'users',
+            tone = account.name == selectedAccount and 'primary' or 'neutral', action = 'banking:select-account',
+            metadata = {
+                { label = 'Type', value = account.type or 'account' },
+                { label = 'Available', value = money(account.balance) },
+            },
+        }
+    end
+
+    local cashActions = {
+        {
+            id = 'banking:withdraw', label = 'Withdraw cash', icon = 'dollar-sign', variant = 'primary',
+            disabled = snapshot.mode == 'atm' and (not selected or (tonumber(selected.balance) or 0) < 1),
+            fields = {
+                { id = 'account', label = 'From account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
+                { id = 'amount', label = 'Amount', type = 'number', min = 1,
+                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= 1 and selected.balance or nil,
+                    required = true, placeholder = '0', presets = amountPresets(),
+                    description = snapshot.mode == 'atm' and selected and (money(selected.balance) .. ' available in this account')
+                        or 'Each account option shows its current available balance.' },
+                { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
+            },
+        },
+        {
+            id = 'banking:deposit', label = 'Deposit cash', icon = 'dollar-sign', variant = 'secondary',
+            disabled = (tonumber(snapshot.profile.cash) or 0) < 1,
+            fields = {
+                { id = 'account', label = 'To account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
+                { id = 'amount', label = 'Amount', type = 'number', min = 1,
+                    max = (tonumber(snapshot.profile.cash) or 0) >= 1 and tonumber(snapshot.profile.cash) or nil,
+                    required = true, placeholder = '0', presets = amountPresets(),
+                    description = money(snapshot.profile.cash) .. ' cash available' },
+                { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
+            },
+        },
+    }
+
+    local navigation = {
+        {
+            id = 'accounts', label = 'Accounts', icon = 'wallet', badge = #accounts,
+            defaultTab = 'summary',
+            tabs = {
+                {
+                    id = 'summary', label = 'Summary',
+                    content = {
+                        title = 'Accessible accounts', description = 'Choose an account to view its current balance and activity.',
+                        blocks = {
+                            { type = 'stats', items = {
+                                { label = 'Cash on hand', value = money(snapshot.profile.cash), icon = 'dollar-sign' },
+                                { label = 'Selected balance', value = selected and money(selected.balance) or '—', icon = 'dollar-sign', tone = 'primary' },
+                            } },
+                            { type = 'list', id = 'bank-accounts', title = 'Accounts', layout = 'cards', searchable = true,
+                                pageSize = 6, items = accountItems, empty = 'No accounts are available.' },
+                        },
+                    },
+                },
+                {
+                    id = 'activity', label = 'Activity',
+                    content = {
+                        title = selected and (selected.owner or selected.name) or 'Account activity',
+                        description = selected and ('Recent transactions for %s.'):format(selected.label or selected.name) or 'Choose an account first.',
+                        blocks = {
+                            {
+                                type = 'table', id = 'bank-activity', title = 'Recent transactions', searchable = true, pageSize = 10,
+                                columns = {
+                                    { key = 'type', label = 'Type', sortable = true }, { key = 'amount', label = 'Amount', align = 'right', sortable = true },
+                                    { key = 'reason', label = 'Reference' }, { key = 'date', label = 'Date', sortable = true },
+                                },
+                                rows = activityRows(), empty = 'No transactions yet.',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        {
+            id = 'cash', label = 'Cash', icon = 'dollar-sign',
+            defaultTab = 'withdraw',
+            tabs = {
+                {
+                    id = 'withdraw', label = 'Withdraw',
+                    content = {
+                        title = snapshot.mode == 'atm' and 'ATM withdrawal' or 'Withdraw cash',
+                        description = snapshot.mode == 'atm' and (Config.useDailyLimit and ('Daily withdrawal limit: %s.'):format(money(Config.dailyLimit)) or 'Withdraw cash using your personal account.')
+                            or 'Withdraw cash from an account you can use.',
+                        actions = { cashActions[1] }, blocks = { { type = 'text', text = ('Cash on hand: %s'):format(money(snapshot.profile.cash)) } },
+                    },
+                },
+                {
+                    id = 'deposit', label = 'Deposit',
+                    content = {
+                        title = 'Deposit cash', description = 'Deposit cash into an account you can use.',
+                        actions = { cashActions[2] }, blocks = { { type = 'text', text = ('Cash on hand: %s'):format(money(snapshot.profile.cash)) } },
+                    },
+                },
+            },
+        },
+    }
+
+    if snapshot.mode ~= 'atm' then
+        navigation[#navigation + 1] = {
+            id = 'transfer', label = 'Transfer', icon = 'arrow-right',
+            defaultTab = 'accounts',
+            tabs = {
+                {
+                    id = 'accounts', label = 'My accounts',
+                    content = {
+                        title = 'Move money between accounts', description = 'Transfers are checked by the banking server before any funds move.',
+                        actions = {
+                    {
+                        id = 'banking:transfer:internal', label = 'Between my accounts', icon = 'arrow-right', variant = 'primary',
+                        fields = {
+                            { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
+                            { id = 'to', label = 'To', type = 'select', options = accountSelect, required = true },
+                            { id = 'amount', label = 'Amount', type = 'number', min = 1, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' },
+                            { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
+                        },
+                    },
+                        },
+                    },
+                },
+                {
+                    id = 'player', label = 'Another player',
+                    content = {
+                        title = 'Send to another player', description = 'The recipient must be online for a player transfer to complete.',
+                        actions = {
+                    {
+                        id = 'banking:transfer:player', label = 'To another player', icon = 'arrow-right', variant = 'secondary',
+                        fields = {
+                            { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
+                            { id = 'recipient', label = 'Recipient account number', type = 'text', required = true, minLength = 1 },
+                            { id = 'amount', label = 'Amount', type = 'number', min = 1, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' },
+                            { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
+                        },
+                    },
+                        },
+                    },
+                },
+            },
+        }
+
+        navigation[#navigation + 1] = {
+            id = 'manage', label = 'Manage', icon = 'settings',
+            defaultTab = 'shared',
+            tabs = {
+                {
+                    id = 'shared', label = 'Shared accounts',
+                    content = {
+                        title = 'Create a shared account', description = 'Shared accounts are funded from your personal bank balance.',
+                        actions = {
+                    {
+                        id = 'banking:create-shared', label = 'Create shared account', icon = 'plus', variant = 'primary',
+                        fields = {
+                            { id = 'name', label = 'Account name', type = 'text', required = true },
+                            { id = 'amount', label = 'Opening balance', type = 'number', min = 0, required = true, default = 0 },
+                        },
+                    },
+                        },
+                    },
+                },
+                {
+                    id = 'card', label = 'Bank card',
+                    content = {
+                        title = 'Issue a bank card', description = 'A personal bank card is required for secure ATM access.',
+                        actions = {
+                    {
+                        id = 'banking:order-card', label = 'Issue bank card', icon = 'credit-card', variant = 'secondary',
+                        fields = { { id = 'pin', label = 'Choose a 4-digit PIN', type = 'password', required = true,
+                            minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true } },
+                    },
+                        },
+                    },
+                },
+                {
+                    id = 'access', label = 'Account access',
+                    content = {
+                        title = 'Manage account access', description = 'Only shared-account owners can make these changes.',
+                        blocks = {
+                    {
+                        type = 'actions', title = 'Account access', actions = {
+                            {
+                                id = 'banking:rename-shared', label = 'Rename shared account', icon = 'pencil', variant = 'outline', disabled = #managedAccounts == 0,
+                                fields = {
+                                    { id = 'account', label = 'Account', type = 'select', options = managedAccounts, required = true },
+                                    { id = 'name', label = 'New name', type = 'text', required = true },
+                                },
+                            },
+                            {
+                                id = 'banking:add-member', label = 'Grant access', icon = 'user', variant = 'outline', disabled = #managedAccounts == 0,
+                                fields = {
+                                    { id = 'account', label = 'Account', type = 'select', options = managedAccounts, required = true },
+                                    { id = 'citizenid', label = 'Citizen ID', type = 'text', required = true },
+                                },
+                            },
+                            {
+                                id = 'banking:remove-member', label = 'Revoke access', icon = 'user', variant = 'destructive', disabled = #managedAccounts == 0,
+                                confirm = 'Remove this person from the selected shared account?',
+                                fields = {
+                                    { id = 'account', label = 'Account', type = 'select', options = managedAccounts, required = true },
+                                    { id = 'citizenid', label = 'Citizen ID', type = 'text', required = true },
+                                },
+                            },
+                            {
+                                id = 'banking:delete-shared', label = 'Close shared account', icon = 'trash-2', variant = 'destructive', disabled = #managedAccounts == 0,
+                                confirm = 'Close this shared account? It must have a zero balance.',
+                                fields = { { id = 'account', label = 'Account', type = 'select', options = managedAccounts, required = true } },
+                            },
+                        },
+                    },
+                        },
+                    },
+                },
+            },
+        }
+    end
+
+    return {
+        id = APP_ID, title = snapshot.mode == 'atm' and 'QBCore ATM' or 'QBCore Bank',
+        description = snapshot.mode == 'atm' and 'Personal banking' or 'Secure account services', icon = 'dollar-sign',
+        accent = type(Config.ui.accent) == 'string' and Config.ui.accent or nil,
+        layout = snapshot.mode == 'atm' and 'compact' or 'standard',
+        width = snapshot.mode == 'atm' and 540 or 1180, height = snapshot.mode == 'atm' and 720 or 760,
+        defaultView = snapshot.mode == 'atm' and 'cash' or 'accounts', navigation = navigation,
+        footer = 'Every transaction is verified by the banking server.',
+    }
+end
+
+local function appUpdate()
+    local definition = appDefinition()
+    return {
+        title = definition.title, description = definition.description, accent = definition.accent,
+        layout = definition.layout, width = definition.width, height = definition.height, defaultView = definition.defaultView,
+        navigation = definition.navigation, footer = definition.footer,
+    }
+end
+
+local function refreshApp()
+    local definition = appDefinition()
+    definition.onAction = function(actionId, context)
+        local values = type(context and context.value) == 'table' and context.value or {}
+
+        if actionId == 'banking:unlock' then
+            local snapshot, err = request('pin', values.pin)
+            if not snapshot then error(err or 'Incorrect PIN.') end
+            currentSnapshot = snapshot
+            selectedAccount = 'checking'
+            return { update = appUpdate() }
+        end
+
+        if actionId == 'banking:select-account' then
+            local account = accountByName(context and context.itemId)
+            if not account then error('That account is no longer available.') end
+            selectedAccount = account.name
+            return { update = appUpdate() }
+        end
+
+        local payload
+        if actionId == 'banking:withdraw' or actionId == 'banking:deposit' then
+            payload = { kind = actionId:match('banking:(.+)'), account = values.account, amount = values.amount, reason = values.reason }
+        elseif actionId == 'banking:transfer:internal' then
+            payload = { kind = 'transfer', from = values.from, to = values.to, amount = values.amount, reason = values.reason }
+        elseif actionId == 'banking:transfer:player' then
+            payload = { kind = 'transfer', from = values.from, recipient = values.recipient, amount = values.amount, reason = values.reason }
+        elseif actionId == 'banking:order-card' then
+            payload = { kind = 'orderCard', pin = values.pin }
+        elseif actionId == 'banking:create-shared' then
+            payload = { kind = 'create', name = values.name, amount = values.amount }
+        elseif actionId == 'banking:rename-shared' then
+            payload = { kind = 'rename', account = values.account, name = values.name }
+        elseif actionId == 'banking:delete-shared' then
+            payload = { kind = 'delete', account = values.account }
+        elseif actionId == 'banking:add-member' then
+            payload = { kind = 'addMember', account = values.account, citizenid = values.citizenid }
+        elseif actionId == 'banking:remove-member' then
+            payload = { kind = 'removeMember', account = values.account, citizenid = values.citizenid }
+        else
+            error('That banking action is no longer available.')
+        end
+
+        local result, err = request('action', payload)
+        if not result then error(err or 'The transaction was declined.') end
+        currentSnapshot = result.snapshot
+        if not accountByName(selectedAccount) then selectedAccount = 'checking' end
+        return { update = appUpdate(), notice = result.message and { tone = 'success', message = result.message } or nil }
+    end
+    QB.nui.registerApp(definition)
+end
+
+local function closeSession()
+    if not appOpen then return end
+    appOpen = false
+    currentSnapshot = nil
+    TriggerServerEvent('qbbanking:close')
 end
 
 local function open(mode, location)
+    if appOpen then return end
     CreateThread(function()
         local snapshot, err = request('open', mode, location)
         if not snapshot then return notify(err or 'You cannot access banking here.') end
-        setFocus(true)
-        pushTheme()
-        send('qbbanking:open', snapshot)
+        currentSnapshot = snapshot
+        selectedAccount = 'checking'
+        appOpen = true
+        refreshApp()
+        local result = QB.nui.openApp(APP_ID, { viewId = snapshot.locked and 'unlock' or 'accounts' })
+        closeSession()
+        if result == nil then notify('The banking interface could not be opened.') end
     end)
-end
-
-local function close()
-    setFocus(false)
-    send('qbbanking:close', {})
-    TriggerServerEvent('qbbanking:close')
 end
 
 local function nearAtm()
@@ -82,30 +460,20 @@ local function nearAtm()
 end
 
 local function accessAtm()
-    if openingAtm or focused then return end
+    if openingAtm or appOpen then return end
     local entity = nearAtm()
     if not entity then return notify('Move closer to an ATM.') end
 
     openingAtm = true
     CreateThread(function()
         local completed = QB.progressbar.start({
-            label = 'Accessing ATM...',
-            duration = Config.atmAccessTime,
-            canCancel = true,
+            label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
             disable = { move = true, combat = true, car = true },
             anim = { dict = 'amb@prop_human_atm@male@enter', clip = 'enter' },
-            props = {
-                {
-                    model = 'prop_cs_credit_card',
-                    bone = 28422,
-                    offset = vector3(0.1, 0.03, -0.05),
-                    rotation = vector3(0.0, 0.0, 180.0),
-                },
-            },
+            props = { { model = 'prop_cs_credit_card', bone = 28422, offset = vector3(0.1, 0.03, -0.05), rotation = vector3(0.0, 0.0, 180.0) } },
         })
         openingAtm = false
         if not completed then return end
-
         entity = nearAtm()
         if not entity then return notify('Move closer to an ATM.') end
         local coords = GetEntityCoords(entity)
@@ -116,37 +484,22 @@ end
 for index, coords in ipairs(Config.locations) do
     local branchIndex = index
     QB.interact.addCircleZone(('qbbanking:branch:%d'):format(index), coords, 1.2, {
-        {
-            icon = 'building-columns',
-            label = 'Open bank',
-            distance = 1.8,
-            action = function() open('bank', branchIndex) end,
-        },
+        { icon = 'building-columns', label = 'Open bank', distance = 1.8, action = function() open('bank', branchIndex) end },
     }, false)
 end
 
--- Register directly with qbtarget. ATM props stream in and out with the map,
--- so this must be a model target rather than an entity snapshot. Going through
--- QB.interact here also adds an unnecessary availability wrapper; registering
--- the native target option keeps every streamed ATM discoverable.
+-- ATM props stream in and out with the map, so this must remain a model target.
 local atmTargetId
-
 local function registerAtmTargets()
     if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
     atmTargetId = exports.qbtarget:addModel(Config.atmModels, {
-        {
-            icon = 'credit-card',
-            label = 'Use ATM',
-            onSelect = accessAtm,
-        },
+        { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
     }, Config.atmDistance)
 end
 
 registerAtmTargets()
-
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource ~= 'qbtarget' then return end
-    registerAtmTargets()
+    if resource == 'qbtarget' then registerAtmTargets() end
 end)
 
 for _, coords in ipairs(Config.locations) do
@@ -161,44 +514,12 @@ for _, coords in ipairs(Config.locations) do
     EndTextCommandSetBlipName(blip)
 end
 
-local function useCard()
-    accessAtm()
-end
-
-RegisterNetEvent('qbbanking:client:useCard', useCard)
-RegisterNetEvent('qb-banking:client:useCard', useCard)
-
-RegisterNUICallback('qbbanking:ready', function(_, cb)
-    cb({})
-    ready = true
-    for _, message in ipairs(pending) do SendNUIMessage(message) end
-    pending = {}
-    pushTheme()
-end)
-
-RegisterNUICallback('qbbanking:close', function(_, cb)
-    cb({})
-    close()
-end)
-
-RegisterNUICallback('qbbanking:pin', function(data, cb)
-    local snapshot, err = request('pin', data and data.pin)
-    cb(snapshot and { ok = true, snapshot = snapshot } or { ok = false, error = err or 'Incorrect PIN.' })
-end)
-
-RegisterNUICallback('qbbanking:action', function(data, cb)
-    local result, err = request('action', data)
-    cb(result and { ok = true, result = result } or { ok = false, error = err or 'The transaction was declined.' })
-    if result and result.message then
-        notify(result.message, 'success')
-    elseif err then
-        notify(err, 'error')
-    end
-end)
+RegisterNetEvent('qbbanking:client:useCard', accessAtm)
+RegisterNetEvent('qb-banking:client:useCard', accessAtm)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
-    setFocus(false)
+    closeSession()
     for index in ipairs(Config.locations) do pcall(function() QB.interact.removeZone(('qbbanking:branch:%d'):format(index)) end) end
     if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
 end)

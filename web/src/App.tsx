@@ -13,6 +13,20 @@ function AccountIcon({ type }: { type: Account["type"] }) {
   return <Icon className="h-4 w-4" aria-hidden />
 }
 
+function balanceLabel(account: Account) {
+  if (account.type === "checking") return "Personal bank balance"
+  if (account.type === "job") return "Society bank balance"
+  if (account.type === "gang") return "Gang bank balance"
+  return "Shared account balance"
+}
+
+function fundsNote(account: Account) {
+  if (account.type === "checking") return "Your personal funds"
+  if (account.type === "job") return `Society funds for ${account.owner} — not personal money`
+  if (account.type === "gang") return `Gang funds for ${account.owner} — not personal money`
+  return `Shared funds for ${account.owner}`
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label><span className="label">{label}</span>{children}</label>
 }
@@ -98,7 +112,7 @@ function ATM({ snapshot, close, run }: { snapshot: Snapshot; close: () => void; 
   const account = snapshot.accounts[0]
   return <main className="app-surface w-[440px]">
     <header className="flex items-center justify-between border-b border-border px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-primary"><Landmark className="h-4 w-4" /></span><div><p className="text-sm font-semibold">QBCore ATM</p><p className="text-xs text-muted-foreground">Personal banking</p></div></div><CloseButton close={close} /></header>
-    <section className="border-b border-border bg-card px-6 py-5"><p className="text-xs uppercase tracking-[.08em] text-muted-foreground">Available balance</p><p className="mt-1 font-mono text-3xl font-semibold tabular-nums">{money(account.balance)}</p><p className="mt-2 text-xs text-muted-foreground">Cash on hand · {money(snapshot.profile.cash)}{snapshot.limits.daily ? ` · ${money(snapshot.limits.daily)} daily withdrawal limit` : ""}</p></section>
+    <section className="border-b border-border bg-card px-6 py-5"><p className="text-xs uppercase tracking-[.08em] text-muted-foreground">Personal bank balance</p><p className="mt-1 font-mono text-3xl font-semibold tabular-nums">{money(account.balance)}</p><p className="mt-2 text-xs text-muted-foreground">Cash on hand · {money(snapshot.profile.cash)}{snapshot.limits.daily ? ` · ${money(snapshot.limits.daily)} daily withdrawal limit` : ""}</p></section>
     <section className="p-6"><CashForm account={account} cash={snapshot.profile.cash} run={run} compact /></section>
     <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground"><span>Session secured</span><button className="button-ghost" onClick={close}><LogOut className="h-4 w-4" />Finish</button></footer>
   </main>
@@ -181,17 +195,17 @@ function Bank({ snapshot, close, update }: { snapshot: Snapshot; close: () => vo
     } catch { setError("The bank did not answer."); return false }
   }
 
-  return <main className="app-surface flex h-[700px] w-[1120px]">
-    <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-card">
+  return <main className="app-surface flex h-[min(700px,calc(100vh-2rem))] w-[min(1120px,calc(100vw-2rem))] max-[760px]:flex-col max-[760px]:rounded-lg">
+    <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-card max-[760px]:h-[172px] max-[760px]:w-full max-[760px]:border-b max-[760px]:border-r-0">
       <div className="flex items-center gap-3 border-b border-border px-5 py-5"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-soft text-primary"><Landmark className="h-5 w-5" /></span><div><p className="font-semibold">QBCore Bank</p><p className="text-xs text-muted-foreground">Secure account services</p></div></div>
       <div className="border-b border-border px-5 py-4"><p className="truncate text-sm font-medium">{snapshot.profile.name}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{snapshot.profile.accountNumber}</p><div className="mt-3 flex items-center justify-between text-xs"><span className="text-muted-foreground">Cash on hand</span><span className="font-mono tabular-nums">{money(snapshot.profile.cash)}</span></div></div>
-      <div className="scroll-thin flex-1 space-y-2 overflow-y-auto p-3"><p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">Your accounts</p>{snapshot.accounts.map((account) => <button key={account.name} onClick={() => { setSelectedName(account.name); setView("activity") }} className={`w-full rounded-lg border p-3 text-left transition-colors ${selected.name === account.name ? "border-brand-border bg-brand-soft" : "border-transparent hover:bg-surface-hover"}`}><span className="flex items-center gap-2 text-xs text-muted-foreground"><AccountIcon type={account.type} />{account.label}</span><span className="mt-1.5 block truncate text-sm font-medium">{account.owner}</span><span className="mt-1 block font-mono text-lg font-semibold tabular-nums">{money(account.balance)}</span></button>)}</div>
-      <button className="button-ghost m-3 justify-start" onClick={close}><LogOut className="h-4 w-4" />Sign out</button>
+      <div className="scroll-thin flex-1 space-y-2 overflow-y-auto p-3 max-[760px]:flex max-[760px]:gap-2 max-[760px]:space-y-0 max-[760px]:overflow-x-auto"><p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground max-[760px]:hidden">Accessible accounts</p>{snapshot.accounts.map((account) => <button key={account.name} onClick={() => { setSelectedName(account.name); setView("activity") }} className={`w-full rounded-lg border p-3 text-left transition-colors max-[760px]:w-44 max-[760px]:shrink-0 ${selected.name === account.name ? "border-brand-border bg-brand-soft" : "border-transparent hover:bg-surface-hover"}`}><span className="flex items-center gap-2 text-xs text-muted-foreground"><AccountIcon type={account.type} />{account.label}</span><span className="mt-1.5 block truncate text-sm font-medium">{account.owner}</span><span className="mt-1 block text-[11px] text-muted-foreground">{balanceLabel(account)}</span><span className="mt-0.5 block font-mono text-lg font-semibold tabular-nums">{money(account.balance)}</span>{account.type !== "checking" && <span className="mt-1 block text-[11px] text-muted-foreground">Not personal money</span>}</button>)}</div>
+      <button className="button-ghost m-3 justify-start max-[760px]:hidden" onClick={close}><LogOut className="h-4 w-4" />Sign out</button>
     </aside>
     <section className="flex min-w-0 flex-1 flex-col">
-      <header className="flex h-[92px] shrink-0 items-center justify-between border-b border-border px-7"><div><div className="flex items-center gap-2"><span className="rounded bg-brand-soft px-2 py-1 text-[10px] font-semibold uppercase tracking-[.08em] text-primary">{selected.label}</span><span className="text-xs text-muted-foreground">{selected.name}</span></div><h1 className="mt-2 text-xl font-semibold">{selected.owner}</h1></div><div className="flex items-center gap-5"><div className="text-right"><p className="text-xs text-muted-foreground">Available balance</p><p className="font-mono text-2xl font-semibold tabular-nums">{money(selected.balance)}</p></div><CloseButton close={close} /></div></header>
-      <nav className="flex shrink-0 gap-1 border-b border-border px-6 py-2">{navigation.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setView(id)} className={`button-ghost ${view === id ? "bg-brand-soft text-primary" : ""}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>
-      <div className="scroll-thin flex-1 overflow-y-auto p-7">{error && <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"><span>{error}</span><button onClick={() => setError(undefined)}><X className="h-4 w-4" /></button></div>}{view === "activity" && <Activity account={selected} snapshot={snapshot} />}{view === "cash" && <CashForm key={selected.name} account={selected} cash={snapshot.profile.cash} run={run} />}{view === "transfer" && <TransferForm accounts={snapshot.accounts} selected={selected} run={run} />}{view === "manage" && <Manage accounts={snapshot.accounts} maxAccounts={snapshot.limits.maxAccounts} run={run} />}</div>
+      <header className="flex h-[112px] shrink-0 items-center justify-between border-b border-border px-7 max-[760px]:h-[82px] max-[760px]:px-4"><div className="min-w-0"><div className="flex items-center gap-2"><span className="rounded bg-brand-soft px-2 py-1 text-[10px] font-semibold uppercase tracking-[.08em] text-primary">{selected.label}</span><span className="truncate text-xs text-muted-foreground">{selected.name}</span></div><h1 className="mt-2 truncate text-xl font-semibold max-[760px]:text-base">{selected.owner}</h1><p className="mt-1 truncate text-xs text-muted-foreground">{fundsNote(selected)}</p></div><div className="flex shrink-0 items-center gap-5 max-[760px]:gap-2"><div className="text-right"><p className="text-xs text-muted-foreground">{balanceLabel(selected)}</p><p className="font-mono text-2xl font-semibold tabular-nums max-[760px]:text-lg">{money(selected.balance)}</p></div><CloseButton close={close} /></div></header>
+      <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-6 py-2 max-[760px]:px-2">{navigation.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setView(id)} className={`button-ghost shrink-0 ${view === id ? "bg-brand-soft text-primary" : ""}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>
+      <div className="scroll-thin flex-1 overflow-y-auto p-7 max-[760px]:p-4">{error && <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"><span>{error}</span><button onClick={() => setError(undefined)}><X className="h-4 w-4" /></button></div>}{view === "activity" && <Activity account={selected} snapshot={snapshot} />}{view === "cash" && <CashForm key={selected.name} account={selected} cash={snapshot.profile.cash} run={run} />}{view === "transfer" && <TransferForm accounts={snapshot.accounts} selected={selected} run={run} />}{view === "manage" && <Manage accounts={snapshot.accounts} maxAccounts={snapshot.limits.maxAccounts} run={run} />}</div>
     </section>
   </main>
 }
