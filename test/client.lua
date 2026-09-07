@@ -1,5 +1,5 @@
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
-local netEvents, zones, apps, atmOptions = {}, {}, {}, nil
+local netEvents, branchOptions, apps, atmOptions = {}, nil, {}, nil
 local unlockResult
 
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
@@ -58,6 +58,8 @@ end
 
 _G.exports = {
     qbtarget = {
+        addSphereZone = function(_, options) branchOptions = options.options; return 'branch-target' end,
+        removeZone = function() end,
         addModel = function(_, _, options) atmOptions = options; return 'atm-target' end,
         removeModel = function() end,
     },
@@ -66,10 +68,6 @@ _G.exports = {
 _G.QB = {
     notify = { send = function() end },
     progressbar = { start = function() return true end },
-    interact = {
-        addCircleZone = function(id, _, _, options) zones[id] = options end,
-        removeZone = function() end,
-    },
     nui = {
         registerApp = function(definition) apps[#apps + 1] = definition end,
         openApp = function()
@@ -101,7 +99,7 @@ local function tab(candidate, id)
     for _, value in ipairs(candidate.tabs or {}) do if value.id == id then return value end end
 end
 
-zones['qbbanking:branch:1'][1].action()
+branchOptions[1].onSelect()
 local bank = apps[#apps]
 equal(bank.id, 'qbbanking:bank', 'banking registers the shared AppShell')
 equal(bank.layout, 'standard', 'a branch uses the standard workspace')
@@ -133,7 +131,7 @@ equal(withdraw.fields[2].max, 2400, 'ATM withdrawals expose the selected availab
 equal(#withdraw.fields[2].presets, 4, 'ATM withdrawals retain compact amount presets')
 
 bankSnapshot.profile.cash = 0
-zones['qbbanking:branch:1'][1].action()
+branchOptions[1].onSelect()
 local emptyDeposit = tab(view(apps[#apps], 'cash'), 'deposit').content.actions[1]
 truthy(emptyDeposit.disabled, 'deposit is disabled when the player has no cash')
 equal(emptyDeposit.fields[2].max, nil, 'zero cash never produces invalid min/max bounds')

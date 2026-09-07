@@ -12,6 +12,7 @@ local pendingRequests = {}
 local currentSnapshot
 local selectedAccount = 'checking'
 local appOpen = false
+local branchTargetIds = {}
 
 local function notify(message, kind)
     QB.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
@@ -481,11 +482,22 @@ local function accessAtm()
     end)
 end
 
-for index, coords in ipairs(Config.locations) do
-    local branchIndex = index
-    QB.interact.addCircleZone(('qbbanking:branch:%d'):format(index), coords, 1.2, {
-        { icon = 'building-columns', label = 'Open bank', distance = 1.8, action = function() open('bank', branchIndex) end },
-    }, false)
+local function registerBranchTargets()
+    for _, targetId in pairs(branchTargetIds) do
+        pcall(function() exports.qbtarget:removeZone(targetId) end)
+    end
+    branchTargetIds = {}
+
+    for index, coords in ipairs(Config.locations) do
+        local branchIndex = index
+        branchTargetIds[index] = exports.qbtarget:addSphereZone({
+            coords = coords,
+            radius = 1.2,
+            options = {
+                { icon = 'building-columns', label = 'Open bank', distance = 1.8, onSelect = function() open('bank', branchIndex) end },
+            },
+        })
+    end
 end
 
 -- ATM props stream in and out with the map, so this must remain a model target.
@@ -497,9 +509,12 @@ local function registerAtmTargets()
     }, Config.atmDistance)
 end
 
+registerBranchTargets()
 registerAtmTargets()
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource == 'qbtarget' then registerAtmTargets() end
+    if resource ~= 'qbtarget' then return end
+    registerBranchTargets()
+    registerAtmTargets()
 end)
 
 for _, coords in ipairs(Config.locations) do
@@ -520,6 +535,6 @@ RegisterNetEvent('qb-banking:client:useCard', accessAtm)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
     closeSession()
-    for index in ipairs(Config.locations) do pcall(function() QB.interact.removeZone(('qbbanking:branch:%d'):format(index)) end) end
+    for _, targetId in pairs(branchTargetIds) do pcall(function() exports.qbtarget:removeZone(targetId) end) end
     if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
 end)
