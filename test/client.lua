@@ -1,5 +1,5 @@
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
-local netEvents, branchOptions, apps, atmOptions = {}, nil, {}, nil
+local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
 local unlockResult
 
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
@@ -16,16 +16,6 @@ _G.GetEntityCoords = function(entity)
 end
 _G.GetClosestObjectOfType = function() return 44 end
 _G.joaat = function(value) return value end
-_G.AddBlipForCoord = function() return 1 end
-_G.SetBlipSprite = function() end
-_G.SetBlipDisplay = function() end
-_G.SetBlipScale = function() end
-_G.SetBlipColour = function() end
-_G.SetBlipAsShortRange = function() end
-_G.BeginTextCommandSetBlipName = function() end
-_G.AddTextComponentSubstringPlayerName = function() end
-_G.EndTextCommandSetBlipName = function() end
-
 _G.promise = { new = function()
     local value = {}
     function value:resolve(result) self.value = result end
@@ -66,6 +56,12 @@ _G.exports = {
 }
 
 _G.QB = {
+    blips = {
+        create = function(coords, options)
+            createdBlips[#createdBlips + 1] = { coords = coords, options = options }
+            return #createdBlips
+        end,
+    },
     notify = { send = function() end },
     progressbar = { start = function() return true end },
     nui = {
@@ -106,6 +102,10 @@ local function tab(candidate, id)
 end
 
 truthy(contains(Config.atmModels, 'gabz_sm_pb_atmframe'), 'the Gabz Fleeca ATM frame is targetable')
+equal(#createdBlips, #Config.locations, 'every configured branch creates one qblib-owned marker')
+equal(createdBlips[1].options.category, 'Bank', 'branch markers share the canonical Bank category')
+equal(createdBlips[1].options.name, nil, 'generic bank markers do not repeat the category as a name')
+equal(createdBlips[1].options.label, nil, 'qblib composes the map label')
 
 branchOptions[1].onSelect()
 local bank = apps[#apps]

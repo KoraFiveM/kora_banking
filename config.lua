@@ -10,10 +10,11 @@ Config = {
     maxSharedMemberBytes = 512,
     memberRateLimit = { max = 5, window = 10000 },
     blipInfo = {
-        name = 'Bank',
+        category = 'Bank',
         sprite = 108,
         color = 2,
-        scale = 0.55
+        scale = 0.55,
+        shortRange = true,
     },
     locations = {
         vector3(149.05, -1041.3, 29.37),

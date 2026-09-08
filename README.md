@@ -6,6 +6,7 @@
 - Full branch services: cash, transfers, transaction history, shared accounts, and bank cards
 - Compact ATM interface with server-side PIN checks and attempt throttling
 - Targetable world ATMs with card animation, owner-bound cards, proximity checks, and configurable daily limits
+- Grouped `Bank` map markers created and cleaned up through qblib
 - qblib callbacks, notifications and interactions
 - qbcore flat exports for players, money, inventory, commands, jobs, and gangs
 - Compatible `AddMoney`, `RemoveMoney`, and account exports for job resources

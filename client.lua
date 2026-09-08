@@ -518,15 +518,7 @@ AddEventHandler('onClientResourceStart', function(resource)
 end)
 
 for _, coords in ipairs(Config.locations) do
-    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
-    SetBlipSprite(blip, Config.blipInfo.sprite)
-    SetBlipDisplay(blip, 4)
-    SetBlipScale(blip, Config.blipInfo.scale)
-    SetBlipColour(blip, Config.blipInfo.color)
-    SetBlipAsShortRange(blip, true)
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentSubstringPlayerName(Config.blipInfo.name)
-    EndTextCommandSetBlipName(blip)
+    QB.blips.create(coords, Config.blipInfo)
 end
 
 RegisterNetEvent('qbbanking:client:useCard', accessAtm)
