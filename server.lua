@@ -259,6 +259,10 @@ local function activeSession(src)
     return current
 end
 
+local function hasBankCard(src)
+    return exports.qbcore:getItemByName(src, 'bank_card') ~= nil
+end
+
 local function cardPins(src)
     local citizenid = exports.qbcore:getPlayerData(src, { 'citizenid' })
     if not citizenid then return {} end
@@ -454,7 +458,7 @@ local function openBanking(src, mode, location)
     if not ready then return nil, 'Banking is still starting.' end
     mode = mode == 'atm' and 'atm' or 'bank'
     if mode == 'atm' then
-        if not next(cardPins(src)) then return nil, 'You need a bank card to use an ATM.' end
+        if not hasBankCard(src) then return nil, 'You need a bank card to use an ATM.' end
         if not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
         session(src, mode, false, location)
         return snapshot(src, mode, false)
@@ -475,6 +479,7 @@ local function pinCallback(src, pin)
     local current = activeSession(src)
     if not current or current.mode ~= 'atm' then return nil, 'Open an ATM first.' end
     if current.lockedUntil and current.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
+    if not hasBankCard(src) then return nil, 'You need a bank card to use an ATM.' end
     local value = tostring(pin or '')
     if not value:match('^%d%d%d%d$') or not cardPins(src)[value] then
         current.attempts = current.attempts + 1
@@ -584,7 +589,7 @@ exports('GetGangAccount', function(name) return Accounts[name] end)
 exports('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
 
 exports.qbcore:createUseable('bank_card', function(src)
-    if exports.qbcore:getItemByName(src, 'bank_card') then TriggerClientEvent('qbbanking:client:useCard', src) end
+    if hasBankCard(src) then TriggerClientEvent('qbbanking:client:useCard', src) end
 end)
 
 exports.qbcore:addCommand('givecash', 'Give nearby player cash', {

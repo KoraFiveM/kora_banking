@@ -1,6 +1,6 @@
 Config = {
     ui = { accent = nil },
-    atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm' },
+    atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe' },
     atmDistance = 1.8,
     atmAccessTime = 1500,
     useDailyLimit = true,

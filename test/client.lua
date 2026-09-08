@@ -92,12 +92,20 @@ local function truthy(value, message)
     if not value then error(message, 2) end
     passed = passed + 1
 end
+local function contains(values, expected)
+    for _, value in ipairs(values) do
+        if value == expected then return true end
+    end
+    return false
+end
 local function view(definition, id)
     for _, candidate in ipairs(definition.navigation) do if candidate.id == id then return candidate end end
 end
 local function tab(candidate, id)
     for _, value in ipairs(candidate.tabs or {}) do if value.id == id then return value end end
 end
+
+truthy(contains(Config.atmModels, 'gabz_sm_pb_atmframe'), 'the Gabz Fleeca ATM frame is targetable')
 
 branchOptions[1].onSelect()
 local bank = apps[#apps]
