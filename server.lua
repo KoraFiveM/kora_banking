@@ -28,10 +28,10 @@ local function roundAmount(value)
 end
 
 local function cleanText(value, fallback, maxLength)
-    if type(value) ~= 'string' then return fallback end
-    value = value:gsub('^%s+', ''):gsub('%s+$', ''):gsub('%s+', ' ')
-    if value == '' then return fallback end
-    return value:sub(1, maxLength or 50)
+    return QB.util.cleanText(value, {
+        maxLength = maxLength or 50,
+        controlCharacters = 'preserve',
+    }) or fallback
 end
 
 local function player(src)
