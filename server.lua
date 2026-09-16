@@ -552,38 +552,38 @@ AddEventHandler('onResourceStart', function(resource)
     SetTimeout(0, registerCallbacks)
 end)
 
-local function CreatePlayerAccount(playerId, accountName, accountBalance, accountUsers)
+local function createPlayerAccount(playerId, accountName, accountBalance, accountUsers)
     local data = exports.qbcore:getPlayerData(playerId)
     if not data then return false end
     return createAccount(accountName, math.max(0, math.floor(tonumber(accountBalance) or 0)), 'shared', data.citizenid, accountUsers)
 end
-exports('CreatePlayerAccount', CreatePlayerAccount)
+exports('CreatePlayerAccount', createPlayerAccount)
 
-local function CreateJobAccount(name, balance) return createAccount(name, balance, 'job') end
-local function CreateGangAccount(name, balance) return createAccount(name, balance, 'gang') end
-exports('CreateJobAccount', CreateJobAccount)
-exports('CreateGangAccount', CreateGangAccount)
+local function createJobAccount(name, balance) return createAccount(name, balance, 'job') end
+local function createGangAccount(name, balance) return createAccount(name, balance, 'gang') end
+exports('CreateJobAccount', createJobAccount)
+exports('CreateGangAccount', createGangAccount)
 
-local function CreateBankStatement(playerId, account, amount, reason, kind, accountType)
+local function createBankStatement(playerId, account, amount, reason, kind, accountType)
     if accountType == 'player' then account = 'checking' end
     return statement(playerId, account, math.floor(tonumber(amount) or 0), reason, kind)
 end
-exports('CreateBankStatement', CreateBankStatement)
+exports('CreateBankStatement', createBankStatement)
 
-local function AddMoney(name, amount, reason)
+local function addMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, amount) then return false end
     return statement(0, name, amount, reason or 'External deposit', 'deposit', nil)
 end
-local function RemoveMoney(name, amount, reason)
+local function removeMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, -amount) then return false end
     return statement(0, name, amount, reason or 'External withdrawal', 'withdraw', nil)
 end
-exports('AddMoney', AddMoney)
-exports('AddGangMoney', AddMoney)
-exports('RemoveMoney', RemoveMoney)
-exports('RemoveGangMoney', RemoveMoney)
+exports('AddMoney', addMoney)
+exports('AddGangMoney', addMoney)
+exports('RemoveMoney', removeMoney)
+exports('RemoveGangMoney', removeMoney)
 exports('GetAccount', function(name) return Accounts[name] end)
 exports('GetGangAccount', function(name) return Accounts[name] end)
 exports('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
