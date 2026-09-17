@@ -209,6 +209,8 @@ local function transactionRows(data, accountRowsList)
     return result
 end
 
+local cardRows
+
 local function snapshot(src, mode, unlocked)
     local data, err = player(src)
     if not data then return nil, err end
@@ -221,6 +223,7 @@ local function snapshot(src, mode, unlocked)
             name = cleanText(('%s %s'):format(info.firstname or '', info.lastname or ''), GetPlayerName(src), 80),
             accountNumber = data.citizenid,
             cash = tonumber(data.money and data.money.cash) or 0,
+            cards = cardRows(src),
         },
         accounts = unlocked == false and {} or list,
         transactions = unlocked == false and {} or transactionRows(data, list),
@@ -276,6 +279,16 @@ local function cardPins(src)
     return pins
 end
 
+cardRows = function(src)
+    local rows = {}
+    for _, item in pairs(exports.qbcore:getItemsByName(src, 'bank_card') or {}) do
+        local info = item.info or {}
+        local number = tostring(info.cardNumber or '')
+        rows[#rows + 1] = { name = info.name or 'Bank card', number = #number >= 4 and ('**** %s'):format(number:sub(-4)) or 'Issued card' }
+    end
+    return rows
+end
+
 local function sourceAccount(data, name)
     if name == 'checking' then return { account_name = 'checking', account_type = 'checking' } end
     local account = Accounts[name]
@@ -320,7 +333,9 @@ local function transactCash(src, data, current, payload)
             "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
             { data.citizenid }
         ) or 0
-        if tonumber(used) + amount > Config.dailyLimit then return nil, ('ATM daily limit: $%s.'):format(Config.dailyLimit) end
+        if tonumber(used) + amount > Config.dailyLimit then
+            return nil, 'Above the limit of what you may withdraw at this ATM.'
+        end
     end
     if not debit(src, data, account, amount, reason) then return nil, 'That account does not have enough money.' end
     if not exports.qbcore:addMoney(src, 'cash', amount, reason, true) then
@@ -384,6 +399,7 @@ local function manage(src, data, payload)
 
     if payload.kind == 'create' then
         local name = cleanText(payload.name, nil, 40)
+        if tonumber(payload.amount) == 0 then return nil, 'You can not open a shared account with $0' end
         local amount = roundAmount(payload.amount)
         if not name or #name < 3 then return nil, 'Account names need at least 3 characters.' end
         if not name:match('^[%w][%w _%-]+$') then return nil, 'Use letters, numbers, spaces, dashes or underscores.' end

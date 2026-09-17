@@ -78,6 +78,20 @@ local function managedAccountOptions(accounts)
     return options
 end
 
+local function managedAccountItems(accounts)
+    local items = {}
+    for _, account in ipairs(accounts or {}) do
+        if account.type == 'shared' and account.canManage then
+            items[#items + 1] = {
+                id = account.name, label = account.owner or account.name, description = account.name,
+                badge = money(account.balance), icon = 'users',
+                metadata = { { label = 'Available', value = money(account.balance) } },
+            }
+        end
+    end
+    return items
+end
+
 local function amountPresets()
     return {
         { label = '$50', value = 50 }, { label = '$100', value = 100 },
@@ -135,6 +149,14 @@ local function appDefinition()
 
     local accountSelect = accountOptions(accounts)
     local managedAccounts = managedAccountOptions(accounts)
+    local managedItems = managedAccountItems(accounts)
+    local cardItems = {}
+    for _, card in ipairs(snapshot.profile.cards or {}) do
+        cardItems[#cardItems + 1] = {
+            id = card.number, label = card.name or 'Bank card', description = card.number,
+            icon = 'credit-card', badge = 'Issued', tone = 'success',
+        }
+    end
     local accountItems = {}
     for _, account in ipairs(accounts) do
         accountItems[#accountItems + 1] = {
@@ -291,6 +313,10 @@ local function appDefinition()
                     id = 'shared', label = 'Shared accounts',
                     content = {
                         title = 'Create a shared account', description = 'Shared accounts are funded from your personal bank balance.',
+                        blocks = {
+                            { type = 'list', id = 'managed-shared-accounts', title = 'Your shared accounts', layout = 'cards',
+                                items = managedItems, empty = 'No shared accounts owned by you.' },
+                        },
                         actions = {
                     {
                         id = 'banking:create-shared', label = 'Create shared account', icon = 'plus', variant = 'primary',
@@ -306,6 +332,10 @@ local function appDefinition()
                     id = 'card', label = 'Bank card',
                     content = {
                         title = 'Issue a bank card', description = 'A personal bank card is required for secure ATM access.',
+                        blocks = {
+                            { type = 'list', id = 'issued-bank-cards', title = 'Issued cards', layout = 'cards',
+                                items = cardItems, empty = 'No bank cards have been issued.' },
+                        },
                         actions = {
                     {
                         id = 'banking:order-card', label = 'Issue bank card', icon = 'credit-card', variant = 'secondary',
@@ -422,7 +452,10 @@ local function refreshApp()
         end
 
         local result, err = request('action', payload)
-        if not result then error(err or 'The transaction was declined.') end
+        if not result then
+            notify(err or 'The transaction was declined.')
+            return {}
+        end
         currentSnapshot = result.snapshot
         if not accountByName(selectedAccount) then selectedAccount = 'checking' end
         return { update = appUpdate(), notice = result.message and { tone = 'success', message = result.message } or nil }

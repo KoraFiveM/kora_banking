@@ -1,5 +1,7 @@
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
+local notifications = {}
+local actionError
 local unlockResult
 
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
@@ -24,7 +26,7 @@ end }
 _G.Citizen = { Await = function(value) return value.value end }
 
 local bankSnapshot = {
-    mode = 'bank', locked = false, profile = { cash = 700 },
+    mode = 'bank', locked = false, profile = { cash = 700, cards = { { name = 'Bank card', number = '**** 1234' } } },
     accounts = {
         { name = 'checking', owner = 'Jamie', label = 'Personal', balance = 2400, type = 'checking' },
         { name = 'club', owner = 'Club Account', label = 'Shared', balance = 900, type = 'shared', canManage = true },
@@ -43,7 +45,7 @@ _G.TriggerServerEvent = function(name, requestId, operation, mode)
     local result
     if operation == 'open' then result = mode == 'atm' and lockedAtm or bankSnapshot
     elseif operation == 'pin' then result = unlockedAtm end
-    netEvents['qbbanking:client:response'](requestId, result, nil)
+    netEvents['qbbanking:client:response'](requestId, result, operation == 'action' and actionError or nil)
 end
 
 _G.exports = {
@@ -62,7 +64,7 @@ _G.QB = {
             return #createdBlips
         end,
     },
-    notify = { send = function() end },
+    notify = { send = function(payload) notifications[#notifications + 1] = payload end },
     progressbar = { start = function() return true end },
     nui = {
         registerApp = function(definition) apps[#apps + 1] = definition end,
@@ -123,6 +125,11 @@ equal(branchWithdraw.fields[2].description, 'Each account option shows its curre
 local activity = tab(view(bank, 'accounts'), 'activity').content.blocks[1]
 truthy(activity.searchable and activity.pageSize == 10, 'activity is searchable and paged')
 truthy(activity.rows[1].type.badge, 'transaction status uses a rich badge cell')
+local manageView = view(bank, 'manage')
+local sharedBlocks = tab(manageView, 'shared').content.blocks
+local cardBlocks = tab(manageView, 'card').content.blocks
+equal(sharedBlocks[1].items[1].label, 'Club Account', 'owned shared accounts are shown in Manage')
+equal(cardBlocks[1].items[1].description, '**** 1234', 'issued bank cards are shown in Manage')
 
 atmOptions[1].onSelect()
 local locked = apps[#apps]
@@ -137,6 +144,12 @@ equal(unlockResult.update.layout, 'compact', 'unlock remains in the compact ATM 
 local withdraw = tab(view({ navigation = unlockResult.update.navigation }, 'cash'), 'withdraw').content.actions[1]
 equal(withdraw.fields[2].max, 2400, 'ATM withdrawals expose the selected available balance')
 equal(#withdraw.fields[2].presets, 4, 'ATM withdrawals retain compact amount presets')
+
+actionError = 'Above the limit of what you may withdraw at this ATM.'
+local rejectedWithdrawal = locked.onAction('banking:withdraw', { value = { account = 'checking', amount = 6000 } })
+truthy(rejectedWithdrawal and next(rejectedWithdrawal) == nil, 'a rejected ATM withdrawal returns a valid empty action result')
+equal(notifications[#notifications].message, actionError, 'an ATM limit rejection is shown in the banking toast')
+actionError = nil
 
 bankSnapshot.profile.cash = 0
 branchOptions[1].onSelect()
