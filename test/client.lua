@@ -2,6 +2,7 @@ local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
 local notifications = {}
 local actionError
+local pinError
 local unlockResult
 
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
@@ -33,19 +34,24 @@ local bankSnapshot = {
     },
     transactions = { checking = { { id = 1, statement_type = 'deposit', amount = 125, reason = 'Pay', date = 'today' } } },
 }
-local lockedAtm = { mode = 'atm', locked = true, profile = { cash = 700 }, accounts = {} }
+local lockedAtm = { mode = 'atm', locked = true, profile = { cash = 700 }, accounts = {}, limits = { daily = 5000, maxAccounts = 2 } }
 local unlockedAtm = {
     mode = 'atm', locked = false, profile = { cash = 700 },
     accounts = { { name = 'checking', owner = 'Jamie', label = 'Personal', balance = 2400, type = 'checking' } },
     transactions = { checking = {} },
+    limits = { daily = 5000, maxAccounts = 2 },
 }
 
 _G.TriggerServerEvent = function(name, requestId, operation, mode)
     if name == 'qbbanking:close' then return end
     local result
     if operation == 'open' then result = mode == 'atm' and lockedAtm or bankSnapshot
-    elseif operation == 'pin' then result = unlockedAtm end
-    netEvents['qbbanking:client:response'](requestId, result, operation == 'action' and actionError or nil)
+    elseif operation == 'pin' then
+        result = pinError and nil or unlockedAtm
+        if pinError then result = false end
+    end
+    netEvents['qbbanking:client:response'](requestId, result,
+        operation == 'action' and actionError or operation == 'pin' and pinError or nil)
 end
 
 _G.exports = {
@@ -140,10 +146,30 @@ truthy(pin.keypad and pin.numericOnly, 'the PIN field uses the compact numeric k
 equal(pin.minLength, 4, 'the PIN field requires four digits')
 equal(pin.maxLength, 4, 'the PIN field rejects extra digits')
 
+pinError = 'Incorrect PIN.'
+local rejectedPin = locked.onAction('banking:unlock', { value = { pin = '0000' } })
+equal(rejectedPin.notice.message, 'Incorrect PIN.', 'an invalid ATM PIN returns the server error message')
+equal(rejectedPin.notice.tone, 'destructive', 'an invalid ATM PIN returns a destructive notice')
+equal(notifications[#notifications].message, 'Incorrect PIN.', 'an invalid ATM PIN is shown in the banking toast')
+pinError = nil
+
 equal(unlockResult.update.layout, 'compact', 'unlock remains in the compact ATM shell')
-local withdraw = tab(view({ navigation = unlockResult.update.navigation }, 'cash'), 'withdraw').content.actions[1]
+local withdrawTab = tab(view({ navigation = unlockResult.update.navigation }, 'cash'), 'withdraw')
+local withdraw = withdrawTab.content.actions[1]
 equal(withdraw.fields[2].max, 2400, 'ATM withdrawals expose the selected available balance')
 equal(#withdraw.fields[2].presets, 4, 'ATM withdrawals retain compact amount presets')
+equal(withdrawTab.content.description, 'Remaining daily withdrawal limit: $5000.', 'ATM withdrawal copy shows the remaining limit')
+
+unlockedAtm.limits.daily = 3000
+local refreshedAtm = locked.onAction('banking:unlock', { value = { pin = '1234' } })
+local refreshedWithdraw = tab(view({ navigation = refreshedAtm.update.navigation }, 'cash'), 'withdraw').content.actions[1]
+equal(refreshedWithdraw.fields[2].max, 2400, 'ATM withdrawal maximum uses the smaller account balance')
+unlockedAtm.accounts[1].balance = 5000
+local refreshedAtmWithLimit = locked.onAction('banking:unlock', { value = { pin = '1234' } })
+local limitedWithdraw = tab(view({ navigation = refreshedAtmWithLimit.update.navigation }, 'cash'), 'withdraw').content.actions[1]
+equal(limitedWithdraw.fields[2].max, 3000, 'ATM withdrawal maximum uses the remaining global limit')
+unlockedAtm.accounts[1].balance = 2400
+unlockedAtm.limits.daily = 5000
 
 actionError = 'Above the limit of what you may withdraw at this ATM.'
 local rejectedWithdrawal = locked.onAction('banking:withdraw', { value = { account = 'checking', amount = 6000 } })

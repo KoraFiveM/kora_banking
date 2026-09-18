@@ -210,6 +210,7 @@ local function transactionRows(data, accountRowsList)
 end
 
 local cardRows
+local dailyWithdrawalRemaining
 
 local function snapshot(src, mode, unlocked)
     local data, err = player(src)
@@ -227,7 +228,7 @@ local function snapshot(src, mode, unlocked)
         },
         accounts = unlocked == false and {} or list,
         transactions = unlocked == false and {} or transactionRows(data, list),
-        limits = { daily = Config.useDailyLimit and Config.dailyLimit or nil, maxAccounts = Config.maxAccounts },
+        limits = { daily = Config.useDailyLimit and dailyWithdrawalRemaining(data) or nil, maxAccounts = Config.maxAccounts },
     }
 end
 
@@ -289,6 +290,14 @@ cardRows = function(src)
     return rows
 end
 
+dailyWithdrawalRemaining = function(data)
+    local used = QB.sql.scalar(
+        "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
+        { data.citizenid }
+    ) or 0
+    return math.max(0, Config.dailyLimit - (tonumber(used) or 0))
+end
+
 local function sourceAccount(data, name)
     if name == 'checking' then return { account_name = 'checking', account_type = 'checking' } end
     local account = Accounts[name]
@@ -329,11 +338,7 @@ local function transactCash(src, data, current, payload)
     end
 
     if current.mode == 'atm' and Config.useDailyLimit then
-        local used = QB.sql.scalar(
-            "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
-            { data.citizenid }
-        ) or 0
-        if tonumber(used) + amount > Config.dailyLimit then
+        if amount > dailyWithdrawalRemaining(data) then
             return nil, 'Above the limit of what you may withdraw at this ATM.'
         end
     end

@@ -150,6 +150,7 @@ local function appDefinition()
     local accountSelect = accountOptions(accounts)
     local managedAccounts = managedAccountOptions(accounts)
     local managedItems = managedAccountItems(accounts)
+    local atmDailyRemaining = snapshot.mode == 'atm' and snapshot.limits and tonumber(snapshot.limits.daily) or nil
     local cardItems = {}
     for _, card in ipairs(snapshot.profile.cards or {}) do
         cardItems[#cardItems + 1] = {
@@ -174,11 +175,13 @@ local function appDefinition()
     local cashActions = {
         {
             id = 'banking:withdraw', label = 'Withdraw cash', icon = 'dollar-sign', variant = 'primary',
-            disabled = snapshot.mode == 'atm' and (not selected or (tonumber(selected.balance) or 0) < 1),
+            disabled = snapshot.mode == 'atm' and (not selected or (tonumber(selected.balance) or 0) < 1
+                or (atmDailyRemaining ~= nil and atmDailyRemaining < 1)),
             fields = {
                 { id = 'account', label = 'From account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                 { id = 'amount', label = 'Amount', type = 'number', min = 1,
-                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= 1 and selected.balance or nil,
+                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= 1
+                        and (atmDailyRemaining == nil and selected.balance or math.min(tonumber(selected.balance), atmDailyRemaining)) or nil,
                     required = true, placeholder = '0', presets = amountPresets(),
                     description = snapshot.mode == 'atm' and selected and (money(selected.balance) .. ' available in this account')
                         or 'Each account option shows its current available balance.' },
@@ -245,7 +248,7 @@ local function appDefinition()
                     id = 'withdraw', label = 'Withdraw',
                     content = {
                         title = snapshot.mode == 'atm' and 'ATM withdrawal' or 'Withdraw cash',
-                        description = snapshot.mode == 'atm' and (Config.useDailyLimit and ('Daily withdrawal limit: %s.'):format(money(Config.dailyLimit)) or 'Withdraw cash using your personal account.')
+                        description = snapshot.mode == 'atm' and (Config.useDailyLimit and ('Remaining daily withdrawal limit: %s.'):format(money(snapshot.limits.daily or 0)) or 'Withdraw cash using your personal account.')
                             or 'Withdraw cash from an account you can use.',
                         actions = { cashActions[1] }, blocks = { { type = 'text', text = ('Cash on hand: %s'):format(money(snapshot.profile.cash)) } },
                     },
@@ -415,7 +418,11 @@ local function refreshApp()
 
         if actionId == 'banking:unlock' then
             local snapshot, err = request('pin', values.pin)
-            if not snapshot then error(err or 'Incorrect PIN.') end
+            if not snapshot then
+                local message = err or 'Invalid PIN.'
+                if QB.notify and QB.notify.send then notify(message) end
+                return { notice = { tone = 'destructive', message = message } }
+            end
             currentSnapshot = snapshot
             selectedAccount = 'checking'
             return { update = appUpdate() }
