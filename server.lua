@@ -142,6 +142,18 @@ local function createAccount(name, balance, kind, citizenid, memberJson)
     return id
 end
 
+local function ensureOrganizationAccounts(data)
+    local job = data.job
+    if boss(job) and type(job.name) == 'string' and not Accounts[job.name] then
+        createAccount(job.name, 0, 'job')
+    end
+
+    local gang = data.gang
+    if boss(gang) and type(gang.name) == 'string' and not Accounts[gang.name] then
+        createAccount(gang.name, 0, 'gang')
+    end
+end
+
 local function adjustAccount(name, delta)
     delta = math.floor(tonumber(delta) or 0)
     if delta == 0 or not Accounts[name] then return false end
@@ -215,6 +227,7 @@ local dailyWithdrawalRemaining
 local function snapshot(src, mode, unlocked)
     local data, err = player(src)
     if not data then return nil, err end
+    if mode == 'bank' then ensureOrganizationAccounts(data) end
     local list = accountRows(data, mode)
     local info = data.charinfo or {}
     return {
