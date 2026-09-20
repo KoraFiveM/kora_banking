@@ -637,6 +637,17 @@ AddEventHandler('playerDropped', function()
     MemberRequests[source] = nil
 end)
 
+local function CreateJobAccount(name, balance)
+    local exists = QB.sql.single('SELECT * FROM bank_accounts WHERE account_name = ?', {name})
+    if exists and exists.id then return end
+    QB.sql.query('INSERT INTO bank_accounts (account_name, account_balance, account_type) VALUES (?, ?, ?)', {name, balance, 'job'})
+end
+local function CreateGangAccount(name, balance)
+    local exists = QB.sql.single('SELECT * FROM bank_accounts WHERE account_name = ?', {name})
+    if exists and exists.id then return end
+    QB.sql.query('INSERT INTO bank_accounts (account_name, account_balance, account_type) VALUES (?, ?, ?)', {name, balance, 'gang'})
+end
+
 CreateThread(function()
     local available, readyErr = QB.sql.ready(60000)
     if not available then
