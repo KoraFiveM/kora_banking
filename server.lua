@@ -674,12 +674,22 @@ CreateThread(function()
     local jobs = QB.shared.all('jobs')
     for _, definition in ipairs(jobs) do
         local name = definition.name
-        if name ~= 'unemployed' and not Accounts[name] then CreateJobAccount(name, 0) end
+        if name ~= 'unemployed' and not Accounts[name] then
+            if not createJobAccount(name, 0) then
+                print(('^1[qbbanking]^7 job account creation failed for %s'):format(name))
+                return
+            end
+        end
     end
     local gangs = QB.shared.all('gangs')
     for _, definition in ipairs(gangs) do
         local name = definition.name
-        if name ~= 'none' and not Accounts[name] then CreateGangAccount(name, 0) end
+        if name ~= 'none' and not Accounts[name] then
+            if not createGangAccount(name, 0) then
+                print(('^1[qbbanking]^7 gang account creation failed for %s'):format(name))
+                return
+            end
+        end
     end
     ready = true
 end)

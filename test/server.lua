@@ -69,3 +69,36 @@ updateFails, statementResult = false, 1
 assert(api.AddMoney('police', 100) == true and api.RemoveMoney('police', 100) == true)
 assert(balance == 1000 and statements == previousStatements + 2)
 print('qbbanking server: balance outcomes and history failure regression passed')
+
+local callbacks, created = {}, {}
+env.Config = { locations = {} }
+env.QB.callback.register = function(name, fn) callbacks[name] = fn end
+env.QB.shared.all = function(kind)
+    return kind == 'jobs' and { { name = 'unemployed' }, { name = 'police' } }
+        or { { name = 'none' }, { name = 'ballas' } }
+end
+env.QB.sql.query = function() return {} end
+env.QB.sql.single = function(sql, params)
+    return params and created[params[1]] or nil
+end
+env.QB.sql.insert = function(_, params)
+    local name = params[2]
+    created[name] = { account_name = name, account_balance = params[3], account_type = params[4] }
+    return 1
+end
+assert(loadfile(root .. 'server.lua', 't', env))()
+threads[#threads]()
+assert(created.police and created.police.account_type == 'job' and created.police.account_balance == 0)
+assert(created.ballas and created.ballas.account_type == 'gang' and created.ballas.account_balance == 0)
+assert(not created.unemployed and not created.none)
+local _, openError = callbacks['qbbanking:open'](1, 'bank', 1)
+assert(openError == 'Move closer to a bank counter.', 'successful organization bootstrap must reach ready')
+
+local logged = false
+env.print = function(message) logged = message:find('account creation failed', 1, true) ~= nil end
+env.QB.sql.insert = function() return nil, 'controlled account creation failure' end
+assert(loadfile(root .. 'server.lua', 't', env))()
+threads[#threads]()
+_, openError = callbacks['qbbanking:open'](1, 'bank', 1)
+assert(logged and openError == 'Banking is still starting.', 'failed account creation must log and leave banking unready')
+print('qbbanking server: fresh organization-account bootstrap regression passed')
