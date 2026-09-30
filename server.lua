@@ -604,15 +604,18 @@ local function createBankStatement(playerId, account, amount, reason, kind, acco
 end
 exports('CreateBankStatement', createBankStatement)
 
+-- qbsql logs history failures; a committed balance change must still report success.
 local function addMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, amount) then return false end
-    return statement(0, name, amount, reason or 'External deposit', 'deposit', nil)
+    statement(0, name, amount, reason or 'External deposit', 'deposit', nil)
+    return true
 end
 local function removeMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, -amount) then return false end
-    return statement(0, name, amount, reason or 'External withdrawal', 'withdraw', nil)
+    statement(0, name, amount, reason or 'External withdrawal', 'withdraw', nil)
+    return true
 end
 exports('AddMoney', addMoney)
 exports('AddGangMoney', addMoney)
