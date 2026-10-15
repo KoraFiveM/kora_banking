@@ -23,6 +23,57 @@ ATMs are available on the models in `Config.atmModels`. Players can order a bank
 
 The resource name is `qbbanking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
 
+## Durable resource transactions
+
+`Config.transactionCallers` authorizes server resources (default `qbhousing`).
+`ExecuteTransaction(operationKey, request)` returns a confirmed receipt, or
+`nil, code, message`. `GetOperation(operationKey)` reads only the caller's receipt
+and completes any pending player/cache synchronization. Both yield.
+
+```lua
+local receipt, code, message = exports.qbbanking:ExecuteTransaction('sale:123', {
+    debits = { { citizenid = buyerCitizenId, amount = 1000 } },
+    credits = { { citizenid = sellerCitizenId, amount = 940 },
+                { account = 'realestate', amount = 60 } },
+    reason = 'Property purchase',
+    statements = { { query = 'UPDATE properties SET owner=? WHERE id=? AND owner=?',
+        values = { buyerCitizenId, propertyId, sellerCitizenId }, expectedRows = 1 } },
+})
+```
+
+Legs must balance in positive whole currency units. Each leg identifies one
+character's bank balance or one existing named bank account. Debit checks use the
+gross debit even when the same account is also credited, and never use core
+negative-balance allowances. Account creation remains an explicit existing API.
+The caller supplies trusted server SQL; validate every domain precondition using
+`expectedRows` and transactional tables. Do not accept SQL or prices from clients.
+
+The exact request is immutable per resource/key. Its unique receipt, ledger legs,
+balances and supplied domain statements commit together. The receipt has
+`operationKey`, `resource`, `status='completed'`, `timestamp`, `amount`, `accounts`.
+Repeating the same request returns its original receipt; changed terms conflict.
+Keep prepared requests durably so retries after restart use identical terms.
+
+`insufficient_funds` is a confirmed debit precondition failure; `unavailable` is
+storage failure, `conflict` is changed terms/domain state, and `rejected` is invalid
+input or an unauthorized caller. `pending` and `indeterminate` retain fences and
+require receipt reconciliation or an identical retry. `GetOperation` can return
+`not_found` after waiting for an old driver worker; it does not execute a new debit.
+Never issue compensating money changes after an ambiguous reply.
+
+Deploy updated qbsql (including its built bundle), qbcore and qbbanking together.
+Core migration 10 records player-column locks; qbbanking migration 1 adds durable
+receipts and a separate ledger supporting 50-character citizen IDs. Existing bank
+exports keep their signatures. The new ledger is included in transaction history.
+Bank startup reconciles its own retained player fences: confirmed receipts publish
+committed balances, and a confirmed absent preparation releases without a debit.
+Receipt lookup uses a locking read to wait for server-side work after a SQL-host
+restart. Failed reconciliation retries only while known operations remain pending.
+An unresolved persistent lock deliberately refuses money/item writes and character
+login until its owning provider reconciles; retain the receipt/lock tables when
+restarting resources. Direct third-party SQL writes to player JSON bypass core
+coordination and are outside this guarantee.
+
 # License
 
     QBCore Framework

@@ -30,8 +30,9 @@ client_scripts {
     'client.lua',
 }
 
-server_script 'server.lua'
+server_scripts { 'server.lua', 'server/finance.lua' }
 
 files {
     'banking.sql',
+    'sql/*.sql',
 }

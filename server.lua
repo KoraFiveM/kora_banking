@@ -2,6 +2,8 @@ local Accounts = {}
 local Sessions = {}
 local MemberRequests = {}
 local ready = false
+local durableHistory = false
+AddEventHandler('qbbanking:durableReady', function() durableHistory = true end)
 
 if not QB.shared.get('items', 'bank_card') then
     local itemRegistered, itemError = QB.shared.register('items', 'bank_card', {
@@ -127,6 +129,8 @@ local function refreshAccount(name)
     return row
 end
 
+AddEventHandler('qbbanking:refreshAccount', refreshAccount)
+
 local function createAccount(name, balance, kind, citizenid, memberJson)
     if Accounts[name] then return false end
     if kind == 'shared' then
@@ -206,15 +210,23 @@ local function transactionRows(data, accountRowsList)
     for _, account in ipairs(accountRowsList) do
         local rows
         if account.name == 'checking' then
-            rows = QB.sql.query(
-                'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE citizenid = ? AND account_name = ? ORDER BY id DESC LIMIT 50',
-                { data.citizenid, 'checking' }
-            ) or {}
+            local sql = 'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE citizenid = ? AND account_name = ?'
+            local params = { data.citizenid, 'checking' }
+            if durableHistory then
+                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id),citizenid,'checking',amount,reason,direction,created_at
+                    FROM bank_operation_legs WHERE citizenid = ? ORDER BY date DESC,id DESC LIMIT 50]]
+                params[3] = data.citizenid
+            else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
+            rows = QB.sql.query(sql, params) or {}
         else
-            rows = QB.sql.query(
-                'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE account_name = ? ORDER BY id DESC LIMIT 50',
-                { account.name }
-            ) or {}
+            local sql = 'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE account_name = ?'
+            local params = { account.name }
+            if durableHistory then
+                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id),citizenid,account_name,amount,reason,direction,created_at
+                    FROM bank_operation_legs WHERE account_name = ? ORDER BY date DESC,id DESC LIMIT 50]]
+                params[2] = account.name
+            else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
+            rows = QB.sql.query(sql, params) or {}
         end
         result[account.name] = rows
     end
