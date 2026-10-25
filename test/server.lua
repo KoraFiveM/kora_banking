@@ -1,5 +1,5 @@
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
-local api, threads = {}, {}
+local api, threads, legacyEvents = {}, {}, {}
 local balance, statements = 1000, 0
 local statementResult, updateFails
 local function noop() end
@@ -34,12 +34,28 @@ local env = setmetatable({
     exports = setmetatable({ qbcore = { createUseable = noop, addCommand = noop } }, {
         __call = function(_, name, fn) api[name] = fn end,
     }),
-    RegisterNetEvent = noop, AddEventHandler = noop,
+    RegisterNetEvent = noop, AddEventHandler = function(name, fn) legacyEvents[name] = fn end,
     GetGameTimer = function() return 0 end,
     CreateThread = function(fn) threads[#threads + 1] = fn end,
 }, { __index = _G })
+env.QB.compat = assert(loadfile(root .. '../qblib/compat/provider.lua', 't', env))()()
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[1]()
+
+local legacyApi = {}
+for name, handler in pairs(api) do
+    local provide = assert(legacyEvents['__cfx_export_qb-banking_' .. name], 'missing legacy export: ' .. name)
+    provide(function(fn) legacyApi[name] = fn end)
+    assert(legacyApi[name] == handler, 'legacy callers must reach the same guarded banking operation')
+end
+assert(legacyApi.AddMoney('police', 25, 'legacy deposit') == true and balance == 1025)
+assert(legacyApi.RemoveMoney('police', 25, 'legacy withdrawal') == true and balance == 1000)
+assert(legacyApi.AddMoney('police', 0 / 0) == false)
+assert(legacyApi.AddMoney('police', math.huge) == false)
+assert(legacyApi.AddMoney('missing', 100) == false)
+assert(legacyApi.RemoveMoney('police', 1001) == false and balance == 1000)
+assert(legacyApi.GetAccountBalance('police') == 1000 and legacyApi.GetAccount('missing') == nil)
+statements = 0
 
 -- The history write must not turn a committed balance change into a failed payment.
 assert(api.AddMoney('police', 100, 'deposit') == true and balance == 1100,

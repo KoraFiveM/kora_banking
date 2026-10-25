@@ -598,23 +598,28 @@ AddEventHandler('onResourceStart', function(resource)
     SetTimeout(0, registerCallbacks)
 end)
 
+local function bankingExport(name, handler)
+    exports(name, handler)
+    QB.compat.provideExport('qb-banking', name, handler)
+end
+
 local function createPlayerAccount(playerId, accountName, accountBalance, accountUsers)
     local data = exports.qbcore:getPlayerData(playerId)
     if not data then return false end
     return createAccount(accountName, math.max(0, math.floor(tonumber(accountBalance) or 0)), 'shared', data.citizenid, accountUsers)
 end
-exports('CreatePlayerAccount', createPlayerAccount)
+bankingExport('CreatePlayerAccount', createPlayerAccount)
 
 local function createJobAccount(name, balance) return createAccount(name, balance, 'job') end
 local function createGangAccount(name, balance) return createAccount(name, balance, 'gang') end
-exports('CreateJobAccount', createJobAccount)
-exports('CreateGangAccount', createGangAccount)
+bankingExport('CreateJobAccount', createJobAccount)
+bankingExport('CreateGangAccount', createGangAccount)
 
 local function createBankStatement(playerId, account, amount, reason, kind, accountType)
     if accountType == 'player' then account = 'checking' end
     return statement(playerId, account, math.floor(tonumber(amount) or 0), reason, kind)
 end
-exports('CreateBankStatement', createBankStatement)
+bankingExport('CreateBankStatement', createBankStatement)
 
 -- qbsql logs history failures; a committed balance change must still report success.
 local function addMoney(name, amount, reason)
@@ -629,13 +634,13 @@ local function removeMoney(name, amount, reason)
     statement(0, name, amount, reason or 'External withdrawal', 'withdraw', nil)
     return true
 end
-exports('AddMoney', addMoney)
-exports('AddGangMoney', addMoney)
-exports('RemoveMoney', removeMoney)
-exports('RemoveGangMoney', removeMoney)
-exports('GetAccount', function(name) return Accounts[name] end)
-exports('GetGangAccount', function(name) return Accounts[name] end)
-exports('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
+bankingExport('AddMoney', addMoney)
+bankingExport('AddGangMoney', addMoney)
+bankingExport('RemoveMoney', removeMoney)
+bankingExport('RemoveGangMoney', removeMoney)
+bankingExport('GetAccount', function(name) return Accounts[name] end)
+bankingExport('GetGangAccount', function(name) return Accounts[name] end)
+bankingExport('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
 
 exports.qbcore:createUseable('bank_card', function(src)
     if hasBankCard(src) then TriggerClientEvent('qbbanking:client:useCard', src) end
