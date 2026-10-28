@@ -37,7 +37,7 @@ local function cleanText(value, fallback, maxLength)
 end
 
 local function player(src)
-    local data = exports.qbcore:getPlayerData(src)
+    local data = exports.kora_core:getPlayerData(src)
     if not data then return nil, 'Player data is unavailable.' end
     return data
 end
@@ -115,7 +115,7 @@ local function displayName(data, account)
 end
 
 local function statement(src, accountName, amount, reason, kind, citizenid)
-    citizenid = citizenid or (src and src > 0 and exports.qbcore:getPlayerData(src, { 'citizenid' }) or nil)
+    citizenid = citizenid or (src and src > 0 and exports.kora_core:getPlayerData(src, { 'citizenid' }) or nil)
     local id = QB.sql.insert(
         'INSERT INTO bank_statements (citizenid, account_name, amount, reason, statement_type) VALUES (?, ?, ?, ?, ?)',
         { citizenid, accountName, amount, cleanText(reason, kind == 'deposit' and 'Deposit' or 'Withdrawal', 50), kind }
@@ -289,13 +289,13 @@ local function activeSession(src)
 end
 
 local function hasBankCard(src)
-    return exports.qbcore:getItemByName(src, 'bank_card') ~= nil
+    return exports.kora_core:getItemByName(src, 'bank_card') ~= nil
 end
 
 local function cardPins(src)
-    local citizenid = exports.qbcore:getPlayerData(src, { 'citizenid' })
+    local citizenid = exports.kora_core:getPlayerData(src, { 'citizenid' })
     if not citizenid then return {} end
-    local items = exports.qbcore:getItemsByName(src, 'bank_card') or {}
+    local items = exports.kora_core:getItemsByName(src, 'bank_card') or {}
     local pins = {}
     for _, item in pairs(items) do
         local info = item.info
@@ -307,7 +307,7 @@ end
 
 cardRows = function(src)
     local rows = {}
-    for _, item in pairs(exports.qbcore:getItemsByName(src, 'bank_card') or {}) do
+    for _, item in pairs(exports.kora_core:getItemsByName(src, 'bank_card') or {}) do
         local info = item.info or {}
         local number = tostring(info.cardNumber or '')
         rows[#rows + 1] = { name = info.name or 'Bank card', number = #number >= 4 and ('**** %s'):format(number:sub(-4)) or 'Issued card' }
@@ -333,13 +333,13 @@ end
 local function debit(src, data, account, amount, reason)
     if account.account_name == 'checking' then
         if (tonumber(data.money.bank) or 0) < amount then return false end
-        return exports.qbcore:removeMoney(src, 'bank', amount, reason, true) == true
+        return exports.kora_core:removeMoney(src, 'bank', amount, reason, true) == true
     end
     return adjustAccount(account.account_name, -amount)
 end
 
 local function credit(src, account, amount, reason)
-    if account.account_name == 'checking' then return exports.qbcore:addMoney(src, 'bank', amount, reason, true) == true end
+    if account.account_name == 'checking' then return exports.kora_core:addMoney(src, 'bank', amount, reason, true) == true end
     return adjustAccount(account.account_name, amount)
 end
 
@@ -353,9 +353,9 @@ local function transactCash(src, data, current, payload)
 
     if payload.kind == 'deposit' then
         if (tonumber(data.money.cash) or 0) < amount then return nil, 'You do not have that much cash.' end
-        if not exports.qbcore:removeMoney(src, 'cash', amount, reason, true) then return nil, 'The cash could not be deposited.' end
+        if not exports.kora_core:removeMoney(src, 'cash', amount, reason, true) then return nil, 'The cash could not be deposited.' end
         if not credit(src, account, amount, reason) then
-            exports.qbcore:addMoney(src, 'cash', amount, 'bank deposit rollback', true)
+            exports.kora_core:addMoney(src, 'cash', amount, 'bank deposit rollback', true)
             return nil, 'The account could not be credited.'
         end
         statement(src, account.account_name, amount, reason, 'deposit')
@@ -368,7 +368,7 @@ local function transactCash(src, data, current, payload)
         end
     end
     if not debit(src, data, account, amount, reason) then return nil, 'That account does not have enough money.' end
-    if not exports.qbcore:addMoney(src, 'cash', amount, reason, true) then
+    if not exports.kora_core:addMoney(src, 'cash', amount, reason, true) then
         credit(src, account, amount, 'bank withdrawal rollback')
         return nil, 'The cash could not be issued.'
     end
@@ -399,11 +399,11 @@ local function transfer(src, data, payload)
 
     local citizenid = cleanText(payload.recipient, nil, 16)
     if not citizenid then return nil, 'Enter an account number.' end
-    local recipient = exports.qbcore:getPlayerByCitizenId(citizenid)
+    local recipient = exports.kora_core:getPlayerByCitizenId(citizenid)
     if not recipient or not recipient.source then return nil, 'That account holder must be online.' end
     if citizenid == data.citizenid then return nil, 'Use an internal transfer for your own accounts.' end
     if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
-    if not exports.qbcore:addMoney(recipient.source, 'bank', amount, reason, true) then
+    if not exports.kora_core:addMoney(recipient.source, 'bank', amount, reason, true) then
         credit(src, from, amount, 'transfer rollback')
         return nil, 'The recipient could not be credited.'
     end
@@ -417,7 +417,7 @@ local function manage(src, data, payload)
         local pin = tostring(payload.pin or '')
         if not pin:match('^%d%d%d%d$') then return nil, 'Choose a 4-digit PIN.' end
         local info = data.charinfo or {}
-        local added = exports.qbcore:addItem(src, 'bank_card', 1, nil, {
+        local added = exports.kora_core:addItem(src, 'bank_card', 1, nil, {
             citizenid = data.citizenid,
             name = cleanText(('%s %s'):format(info.firstname or '', info.lastname or ''), data.citizenid, 80),
             cardNumber = tostring(math.random(10000000, 99999999)) .. tostring(math.random(10000000, 99999999)),
@@ -439,9 +439,9 @@ local function manage(src, data, payload)
         if count >= Config.maxAccounts then return nil, ('You can own up to %d shared accounts.'):format(Config.maxAccounts) end
         if Accounts[name] then return nil, 'That account name is already in use.' end
         if (tonumber(data.money.bank) or 0) < amount then return nil, 'Your personal account does not have enough money.' end
-        if not exports.qbcore:removeMoney(src, 'bank', amount, 'Open shared account', true) then return nil, 'The opening balance could not be withdrawn.' end
+        if not exports.kora_core:removeMoney(src, 'bank', amount, 'Open shared account', true) then return nil, 'The opening balance could not be withdrawn.' end
         if not createAccount(name, amount, 'shared', data.citizenid, '[]') then
-            exports.qbcore:addMoney(src, 'bank', amount, 'account creation rollback', true)
+            exports.kora_core:addMoney(src, 'bank', amount, 'account creation rollback', true)
             return nil, 'The shared account could not be created.'
         end
         statement(src, 'checking', amount, 'Opened ' .. name, 'withdraw')
@@ -569,9 +569,9 @@ end
 
 registerCallbacks()
 
--- Banking's own request channel is deliberately independent from qblib's
--- callback registry. A live qblib reload must not make open/PIN/action
--- requests disappear while qbbanking itself remains running.
+-- Banking's own request channel is deliberately independent from kora_lib's
+-- callback registry. A live kora_lib reload must not make open/PIN/action
+-- requests disappear while kora_banking itself remains running.
 RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
     local src = source
     if type(requestId) ~= 'number' or requestId % 1 ~= 0 or requestId < 1 then return end
@@ -591,10 +591,10 @@ RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
     TriggerClientEvent('qbbanking:client:response', src, requestId, result, err)
 end)
 
--- qblib owns callback registrations. Reinstall ours after a live qblib
+-- kora_lib owns callback registrations. Reinstall ours after a live kora_lib
 -- restart so bank and ATM requests never point at a cleared registry.
 AddEventHandler('onResourceStart', function(resource)
-    if resource ~= 'qblib' then return end
+    if resource ~= 'kora_lib' then return end
     SetTimeout(0, registerCallbacks)
 end)
 
@@ -604,7 +604,7 @@ local function bankingExport(name, handler)
 end
 
 local function createPlayerAccount(playerId, accountName, accountBalance, accountUsers)
-    local data = exports.qbcore:getPlayerData(playerId)
+    local data = exports.kora_core:getPlayerData(playerId)
     if not data then return false end
     return createAccount(accountName, math.max(0, math.floor(tonumber(accountBalance) or 0)), 'shared', data.citizenid, accountUsers)
 end
@@ -621,7 +621,7 @@ local function createBankStatement(playerId, account, amount, reason, kind, acco
 end
 bankingExport('CreateBankStatement', createBankStatement)
 
--- qbsql logs history failures; a committed balance change must still report success.
+-- kora_sql logs history failures; a committed balance change must still report success.
 local function addMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, amount) then return false end
@@ -642,22 +642,22 @@ bankingExport('GetAccount', function(name) return Accounts[name] end)
 bankingExport('GetGangAccount', function(name) return Accounts[name] end)
 bankingExport('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
 
-exports.qbcore:createUseable('bank_card', function(src)
+exports.kora_core:createUseable('bank_card', function(src)
     if hasBankCard(src) then TriggerClientEvent('qbbanking:client:useCard', src) end
 end)
 
-exports.qbcore:addCommand('givecash', 'Give nearby player cash', {
+exports.kora_core:addCommand('givecash', 'Give nearby player cash', {
     { name = 'id', help = 'Player ID' }, { name = 'amount', help = 'Amount' },
 }, true, function(src, args)
     local target, amount = tonumber(args[1]), roundAmount(args[2])
     if not target or not amount then return QB.notify.send(src, { title = 'Banking', message = 'Enter a valid player and amount.', type = 'error' }) end
-    local from, to = player(src), exports.qbcore:getPlayerData(target)
+    local from, to = player(src), exports.kora_core:getPlayerData(target)
     if not from or not to then return QB.notify.send(src, { title = 'Banking', message = 'Player not found.', type = 'error' }) end
     local a, b = GetEntityCoords(GetPlayerPed(src)), GetEntityCoords(GetPlayerPed(target))
     if #(a - b) > 5.0 then return QB.notify.send(src, { title = 'Banking', message = 'That player is too far away.', type = 'error' }) end
-    if not exports.qbcore:removeMoney(src, 'cash', amount, 'cash transfer', true) then return QB.notify.send(src, { title = 'Banking', message = 'You do not have enough cash.', type = 'error' }) end
-    if not exports.qbcore:addMoney(target, 'cash', amount, 'cash transfer', true) then
-        exports.qbcore:addMoney(src, 'cash', amount, 'cash transfer rollback', true)
+    if not exports.kora_core:removeMoney(src, 'cash', amount, 'cash transfer', true) then return QB.notify.send(src, { title = 'Banking', message = 'You do not have enough cash.', type = 'error' }) end
+    if not exports.kora_core:addMoney(target, 'cash', amount, 'cash transfer', true) then
+        exports.kora_core:addMoney(src, 'cash', amount, 'cash transfer rollback', true)
         return QB.notify.send(src, { title = 'Banking', message = 'The transfer failed.', type = 'error' })
     end
     QB.notify.send(src, { title = 'Banking', message = ('Gave $%d.'):format(amount), type = 'success' })

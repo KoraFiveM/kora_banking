@@ -31,14 +31,14 @@ local env = setmetatable({
             end,
         },
     },
-    exports = setmetatable({ qbcore = { createUseable = noop, addCommand = noop } }, {
+    exports = setmetatable({ kora_core = { createUseable = noop, addCommand = noop } }, {
         __call = function(_, name, fn) api[name] = fn end,
     }),
     RegisterNetEvent = noop, AddEventHandler = function(name, fn) legacyEvents[name] = fn end,
     GetGameTimer = function() return 0 end,
     CreateThread = function(fn) threads[#threads + 1] = fn end,
 }, { __index = _G })
-env.QB.compat = assert(loadfile(root .. '../qblib/compat/provider.lua', 't', env))()()
+env.QB.compat = assert(loadfile(root .. '../kora_lib/compat/provider.lua', 't', env))()()
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[1]()
 

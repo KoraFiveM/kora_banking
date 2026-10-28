@@ -39,7 +39,7 @@ These guidelines will help you help us in the best way possible regardless of yo
 
 * [QBCore Website](https://qbcore.org)
 * [QBCore Discord](https://discord.gg/qbcore)
-* [FiveM Discord - #qbcore channel](https://discord.gg/fivem)
+* [FiveM Discord - #kora_core channel](https://discord.gg/fivem)
 
 
 
@@ -105,7 +105,7 @@ Before creating enhancement suggestions, please check [this list](#before-submit
 
 #### Before Submitting An Enhancement Suggestion
 
-* **Make sure it doesn't already exist.** Sounds silly, but there's a lot of features built in to qbcore that people don't realize so take a look through the docs and stuff to make sure it's not already there.
+* **Make sure it doesn't already exist.** Sounds silly, but there's a lot of features built in to kora_core that people don't realize so take a look through the docs and stuff to make sure it's not already there.
 * **Check if there's already PR which provides that enhancement.**
 * **Determine which resource the enhancement should be suggested in.** if it fits with another resource suggest it in that resource. if it would be it's own resource suggest it in the main qb-core repository.
 * **Perform a [cursory search](https://github.com/search?q=+is%3Aissue+user%3Aqbcore-framework)** to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.

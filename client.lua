@@ -1,6 +1,6 @@
--- Banking presentation through qblib's shared AppShell. The server remains
+-- Banking presentation through kora_lib's shared AppShell. The server remains
 -- the authority for every balance, card, proximity and account-access check.
--- qblib owns the browser frame and focus lifecycle.
+-- kora_lib owns the browser frame and focus lifecycle.
 
 local RESOURCE = GetCurrentResourceName()
 local APP_ID = 'qbbanking:bank'
@@ -18,8 +18,8 @@ local function notify(message, kind)
     QB.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
 end
 
--- Keep banking's request transport independent from qblib's callback
--- registry, so a live qblib restart cannot strand a banking session.
+-- Keep banking's request transport independent from kora_lib's callback
+-- registry, so a live kora_lib restart cannot strand a banking session.
 local function request(operation, ...)
     nextRequestId = nextRequestId + 1
     if nextRequestId > 2147483647 then nextRequestId = 1 end
@@ -524,13 +524,13 @@ end
 
 local function registerBranchTargets()
     for _, targetId in pairs(branchTargetIds) do
-        pcall(function() exports.qbtarget:removeZone(targetId) end)
+        pcall(function() exports.kora_target:removeZone(targetId) end)
     end
     branchTargetIds = {}
 
     for index, coords in ipairs(Config.locations) do
         local branchIndex = index
-        branchTargetIds[index] = exports.qbtarget:addSphereZone({
+        branchTargetIds[index] = exports.kora_target:addSphereZone({
             coords = coords,
             radius = 1.2,
             options = {
@@ -543,8 +543,8 @@ end
 -- ATM props stream in and out with the map, so this must remain a model target.
 local atmTargetId
 local function registerAtmTargets()
-    if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
-    atmTargetId = exports.qbtarget:addModel(Config.atmModels, {
+    if atmTargetId then pcall(function() exports.kora_target:removeModel(Config.atmModels, atmTargetId) end) end
+    atmTargetId = exports.kora_target:addModel(Config.atmModels, {
         { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
     }, Config.atmDistance)
 end
@@ -552,7 +552,7 @@ end
 registerBranchTargets()
 registerAtmTargets()
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource ~= 'qbtarget' then return end
+    if resource ~= 'kora_target' then return end
     registerBranchTargets()
     registerAtmTargets()
 end)
@@ -567,6 +567,6 @@ RegisterNetEvent('qb-banking:client:useCard', accessAtm)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
     closeSession()
-    for _, targetId in pairs(branchTargetIds) do pcall(function() exports.qbtarget:removeZone(targetId) end) end
-    if atmTargetId then pcall(function() exports.qbtarget:removeModel(Config.atmModels, atmTargetId) end) end
+    for _, targetId in pairs(branchTargetIds) do pcall(function() exports.kora_target:removeZone(targetId) end) end
+    if atmTargetId then pcall(function() exports.kora_target:removeModel(Config.atmModels, atmTargetId) end) end
 end)

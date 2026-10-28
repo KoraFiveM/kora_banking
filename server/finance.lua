@@ -47,11 +47,11 @@ end
 
 local function synchronize(resource, key)
     local operationKey = operationId(resource, key)
-    for _, operation in ipairs(exports.qbcore:getPlayerColumnOperations()) do
+    for _, operation in ipairs(exports.kora_core:getPlayerColumnOperations()) do
         if operation.operationKey == operationKey then
             local values, err = playerValues(operation.citizenids)
             if not values then return false, err end
-            return exports.qbcore:finishPlayerColumnOperation(operation.token, values)
+            return exports.kora_core:finishPlayerColumnOperation(operation.token, values)
         end
     end
     return true
@@ -117,12 +117,12 @@ local function execute(resource, key, request, fingerprint)
     if existing or code ~= 'not_found' then return existing, code, err end
     local prepared, validationErr = prepare(request)
     if not prepared then return nil, 'rejected', validationErr end
-    local token, lockCode, lockErr = exports.qbcore:beginPlayerColumnOperation(operationId(resource, key), prepared.ids, { 'money' })
+    local token, lockCode, lockErr = exports.kora_core:beginPlayerColumnOperation(operationId(resource, key), prepared.ids, { 'money' })
     if not token then return nil, lockCode, lockErr end
     local values, loadErr = playerValues(prepared.ids)
     if not values then
         if lockCode ~= 'resumed' then
-            local released, releaseErr = exports.qbcore:abortPlayerColumnOperation(token)
+            local released, releaseErr = exports.kora_core:abortPlayerColumnOperation(token)
             if not released then return nil, 'pending', releaseErr end
         end
         return nil, 'unavailable', loadErr
@@ -168,7 +168,7 @@ local function execute(resource, key, request, fingerprint)
         if outcome and outcome.code ~= 'indeterminate' then
             local found, foundCode, foundErr = receipt(resource, key, fingerprint)
             if found or foundCode ~= 'not_found' then return found, foundCode, foundErr end
-            local released, releaseErr = exports.qbcore:abortPlayerColumnOperation(token)
+            local released, releaseErr = exports.kora_core:abortPlayerColumnOperation(token)
             if not released then return nil, 'pending', releaseErr end
         end
         return nil, outcome and outcome.code or 'indeterminate', outcome and outcome.message or transactionErr
@@ -207,7 +207,7 @@ end)
 
 local function recoverOperations()
     recoveryTimer = nil
-    local called, operations = pcall(function() return exports.qbcore:getPlayerColumnOperations() end)
+    local called, operations = pcall(function() return exports.kora_core:getPlayerColumnOperations() end)
     local pending = not called
     if called then
         for _, operation in ipairs(operations) do
@@ -223,7 +223,7 @@ local function recoverOperations()
                     if code ~= 'not_found' then return false end
                     -- No worker remains and no receipt exists: no financial
                     -- mutation committed, so an orphaned preparation can release.
-                    return exports.qbcore:abortPlayerColumnOperation(operation.token)
+                    return exports.kora_core:abortPlayerColumnOperation(operation.token)
                 end)
                 busy[identity] = nil
                 if not recovered or not ok then pending = true end

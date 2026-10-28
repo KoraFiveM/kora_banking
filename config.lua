@@ -1,5 +1,5 @@
 Config = {
-    transactionCallers = { qbhousing = true },
+    transactionCallers = { kora_housing = true },
     ui = { accent = nil },
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe' },
     atmDistance = 1.8,
@@ -29,7 +29,7 @@ Config = {
     }
 }
 
--- Registers this resource-owned configuration with qblib without changing its public Config table.
+-- Registers this resource-owned configuration with kora_lib without changing its public Config table.
 if QB and QB.config and QB.config.adopt then
     local config = QB.config
     Config.atmModels = config.list(Config.atmModels, nil, {

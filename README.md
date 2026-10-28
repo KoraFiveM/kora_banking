@@ -1,37 +1,37 @@
-# qbbanking
+# kora_banking
 
 ## Features
-- qblib AppShell banking interface, shared with the administration menu
+- kora_lib AppShell banking interface, shared with the administration menu
 - Clearly separated personal, society, gang, and shared balances
 - Full branch services: cash, transfers, transaction history, shared accounts, and bank cards
 - Compact ATM interface with server-side PIN checks and attempt throttling
 - Targetable world ATMs with card animation, owner-bound cards, proximity checks, and configurable daily limits
-- Grouped `Bank` map markers created and cleaned up through qblib
-- qblib callbacks, notifications and interactions
-- qbcore flat exports for players, money, inventory, commands, jobs, and gangs
+- Grouped `Bank` map markers created and cleaned up through kora_lib
+- kora_lib callbacks, notifications and interactions
+- kora_core flat exports for players, money, inventory, commands, jobs, and gangs
 - Compatible `AddMoney`, `RemoveMoney`, and account exports for job resources
 
 ## Requirements
 
-- `qblib`
-- `qbsql`
-- `qbcore`
-- `qbtarget`
-- `qbinventory`
+- `kora_lib`
+- `kora_sql`
+- `kora_core`
+- `kora_target`
+- `kora_inventory`
 
 ATMs are available on the models in `Config.atmModels`. Players can order a bank card and choose its PIN at a branch, then target an ATM or use the card while standing beside one. `Config.atmDistance`, `Config.atmAccessTime`, `Config.useDailyLimit`, and `Config.dailyLimit` control the ATM flow.
 
-The resource name is `qbbanking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
+The resource name is `kora_banking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
 
 ## Durable resource transactions
 
-`Config.transactionCallers` authorizes server resources (default `qbhousing`).
+`Config.transactionCallers` authorizes server resources (default `kora_housing`).
 `ExecuteTransaction(operationKey, request)` returns a confirmed receipt, or
 `nil, code, message`. `GetOperation(operationKey)` reads only the caller's receipt
 and completes any pending player/cache synchronization. Both yield.
 
 ```lua
-local receipt, code, message = exports.qbbanking:ExecuteTransaction('sale:123', {
+local receipt, code, message = exports.kora_banking:ExecuteTransaction('sale:123', {
     debits = { { citizenid = buyerCitizenId, amount = 1000 } },
     credits = { { citizenid = sellerCitizenId, amount = 940 },
                 { account = 'realestate', amount = 60 } },
@@ -61,8 +61,8 @@ require receipt reconciliation or an identical retry. `GetOperation` can return
 `not_found` after waiting for an old driver worker; it does not execute a new debit.
 Never issue compensating money changes after an ambiguous reply.
 
-Deploy updated qbsql (including its built bundle), qbcore and qbbanking together.
-Core migration 10 records player-column locks; qbbanking migration 1 adds durable
+Deploy updated kora_sql (including its built bundle), kora_core and kora_banking together.
+Core migration 10 records player-column locks; kora_banking migration 1 adds durable
 receipts and a separate ledger supporting 50-character citizen IDs. Existing bank
 exports keep their signatures. The new ledger is included in transaction history.
 Bank startup reconciles its own retained player fences: confirmed receipts publish

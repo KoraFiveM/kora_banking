@@ -2,27 +2,29 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-name 'qbbanking'
+name 'kora_banking'
+-- Keep the legacy resource name resolvable for exports['qbbanking'] callers.
+provide 'qbbanking'
 author 'qbcore2'
 version '3.0.0'
 description 'Personal, shared, society and gang banking for qbcore'
 
 provide 'qb-banking'
 
--- Banking renders through qblib's headless AppShell, whose frame consumes the
+-- Banking renders through kora_lib's headless AppShell, whose frame consumes the
 -- shared palette. Keep the provider ordered before this resource even though
 -- banking no longer owns a private NUI page or imports the bridge itself.
-dependency 'qbtheme'
-dependency 'qblib'
-dependency 'qbsql'
-dependency 'qbcore'
-dependency 'qbtarget'
-dependency 'qbinventory'
+dependency 'kora_theme'
+dependency 'kora_lib'
+dependency 'kora_sql'
+dependency 'kora_core'
+dependency 'kora_target'
+dependency 'kora_inventory'
 
 shared_scripts {
-    '@qblib/init.lua',
-    '@qbsql/init.lua',
-    '@qbcore/init.lua',
+    '@kora_lib/init.lua',
+    '@kora_sql/init.lua',
+    '@kora_core/init.lua',
     'config.lua',
 }
 

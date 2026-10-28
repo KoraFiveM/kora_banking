@@ -34,7 +34,7 @@ const browser = typeof window.invokeNative !== "function"
 
 export async function fetchNui<T>(name: string, data: unknown = {}): Promise<T> {
   if (browser) return {} as T
-  const resource = window.GetParentResourceName?.() ?? "qbbanking"
+  const resource = window.GetParentResourceName?.() ?? "kora_banking"
   const response = await fetch(`https://${resource}/${name}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
   })

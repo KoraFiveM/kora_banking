@@ -6,7 +6,7 @@ local pinError
 local unlockResult
 
 _G.vector3 = function(x, y, z) return { x = x, y = y, z = z } end
-_G.GetCurrentResourceName = function() return 'qbbanking' end
+_G.GetCurrentResourceName = function() return 'kora_banking' end
 _G.RegisterNetEvent = function(name, handler) netEvents[name] = handler end
 _G.AddEventHandler = function() end
 _G.CreateThread = function(handler) handler() end
@@ -55,7 +55,7 @@ _G.TriggerServerEvent = function(name, requestId, operation, mode)
 end
 
 _G.exports = {
-    qbtarget = {
+    kora_target = {
         addSphereZone = function(_, options) branchOptions = options.options; return 'branch-target' end,
         removeZone = function() end,
         addModel = function(_, _, options) atmOptions = options; return 'atm-target' end,

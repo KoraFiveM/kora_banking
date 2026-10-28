@@ -1,11 +1,11 @@
 -- Real provider code against a transactional, rollback-capable SQL fixture.
-local tools = dofile('../qbcore/test/mocks.lua')
+local tools = dofile('../kora_core/test/mocks.lua')
 local json = { encode = tools.stableEncode, decode = tools.simpleDecode }
 local function copy(value) return json.decode(json.encode(value)) end
 local database = { players = { BUYER = { cash = 0, bank = 10000 }, SELLER = { cash = 0, bank = 0 } },
     accounts = { society = 0, escrow = 0 }, receipts = {}, ledger = {}, owner = 'SELLER' }
 local locks, memory, cache = {}, {}, {}
-local caller = 'qbhousing'
+local caller = 'kora_housing'
 local commits, attempts, assertions = 0, 0, 0
 local function check(value, message) assert(value, message); assertions = assertions + 1 end
 local function boot()
@@ -81,10 +81,10 @@ local function boot()
     end
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.json, env.Config, env.QB = json, { transactionCallers = { qbhousing = true, other = true } }, { sql = sql, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
-    env.exports = setmetatable({ qbcore = core }, { __call = function(_, name, fn) api[name] = fn end })
+    env.json, env.Config, env.QB = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
+    env.exports = setmetatable({ kora_core = core }, { __call = function(_, name, fn) api[name] = fn end })
     env.GetInvokingResource = function() return caller end
-    env.GetCurrentResourceName = function() return 'qbbanking' end
+    env.GetCurrentResourceName = function() return 'kora_banking' end
     env.CreateThread = function(fn) threads[#threads + 1] = fn end
     env.AddEventHandler = function() end
     env.TriggerEvent = function(name, account) if name == 'qbbanking:refreshAccount' then cache[account] = database.accounts[account] end end
@@ -93,7 +93,7 @@ local function boot()
     return api, f
 end
 
-locks['qbbanking:qbhousing:orphan'] = { token = 'qbbanking:qbhousing:orphan', operationKey = 'qbhousing:orphan', citizenids = { 'BUYER' } }
+locks['qbbanking:kora_housing:orphan'] = { token = 'qbbanking:kora_housing:orphan', operationKey = 'kora_housing:orphan', citizenids = { 'BUYER' } }
 local api, f = boot()
 check(next(locks) == nil and commits == 0, 'Startup releases a confirmed absent preparation without creating a financial mutation')
 local sale = { debits = { { citizenid = 'BUYER', amount = 1000 } }, credits = {
@@ -115,7 +115,7 @@ receipt, code = api.GetOperation('sale:one')
 check(not receipt and code == 'not_found', 'Another resource must not read the receipt')
 caller = 'untrusted'
 check(api.ExecuteTransaction('forged', sale) == nil, 'Untrusted callers cannot execute')
-caller = 'qbhousing'
+caller = 'kora_housing'
 
 local rent = { debits = { { citizenid = 'BUYER', amount = 10000 } }, credits = { { citizenid = 'SELLER', amount = 10000 } } }
 receipt, code = api.ExecuteTransaction('rent:insufficient', rent)
