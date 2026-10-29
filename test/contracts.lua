@@ -6,4 +6,8 @@ assert(server:find("createAccount%(job%.name, 0, 'job'%)"), 'job bosses must cre
 assert(server:find("createAccount%(gang%.name, 0, 'gang'%)"), 'gang bosses must create missing gang accounts')
 assert(server:find("if mode == 'bank' then ensureOrganizationAccounts%(data%) end"), 'bank snapshots must discover current organizations')
 
-print('qbbanking contracts: 4 assertions passed')
+-- Both statement UNIONs must pin the legs side to bank_statements' collation (tester report: 'Illegal mix of collations').
+local _, collated = server:gsub("CONCAT%('operation:',id%) COLLATE utf8mb4_unicode_ci", '')
+assert(collated == 2, 'both durable-history UNION queries must collate the bank_operation_legs columns')
+
+print('qbbanking contracts: 5 assertions passed')

@@ -213,7 +213,10 @@ local function transactionRows(data, accountRowsList)
             local sql = 'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE citizenid = ? AND account_name = ?'
             local params = { data.citizenid, 'checking' }
             if durableHistory then
-                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id),citizenid,'checking',amount,reason,direction,created_at
+                -- bank_operation_legs has no explicit collation, so on servers whose default differs from banking.sql's
+                -- utf8mb4_unicode_ci the UNION fails with 'Illegal mix of collations'. Align the legs side to bank_statements.
+                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id) COLLATE utf8mb4_unicode_ci,citizenid COLLATE utf8mb4_unicode_ci,'checking',amount,
+                    reason COLLATE utf8mb4_unicode_ci,direction COLLATE utf8mb4_unicode_ci,created_at
                     FROM bank_operation_legs WHERE citizenid = ? ORDER BY date DESC,id DESC LIMIT 50]]
                 params[3] = data.citizenid
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
@@ -222,7 +225,9 @@ local function transactionRows(data, accountRowsList)
             local sql = 'SELECT id, citizenid, account_name, amount, reason, statement_type, date FROM bank_statements WHERE account_name = ?'
             local params = { account.name }
             if durableHistory then
-                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id),citizenid,account_name,amount,reason,direction,created_at
+                sql = sql .. [[ UNION ALL SELECT CONCAT('operation:',id) COLLATE utf8mb4_unicode_ci,citizenid COLLATE utf8mb4_unicode_ci,
+                    account_name COLLATE utf8mb4_unicode_ci,amount,reason COLLATE utf8mb4_unicode_ci,
+                    direction COLLATE utf8mb4_unicode_ci,created_at
                     FROM bank_operation_legs WHERE account_name = ? ORDER BY date DESC,id DESC LIMIT 50]]
                 params[2] = account.name
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
