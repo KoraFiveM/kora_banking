@@ -110,10 +110,10 @@ local function tab(candidate, id)
 end
 
 truthy(contains(Config.atmModels, 'gabz_sm_pb_atmframe'), 'the Gabz Fleeca ATM frame is targetable')
-equal(#createdBlips, #Config.locations, 'every configured branch creates one qblib-owned marker')
+equal(#createdBlips, #Config.locations, 'every configured branch creates one kora_lib-owned marker')
 equal(createdBlips[1].options.category, 'Bank', 'branch markers share the canonical Bank category')
 equal(createdBlips[1].options.name, nil, 'generic bank markers do not repeat the category as a name')
-equal(createdBlips[1].options.label, nil, 'qblib composes the map label')
+equal(createdBlips[1].options.label, nil, 'kora_lib composes the map label')
 
 branchOptions[1].onSelect()
 local bank = apps[#apps]

@@ -83,7 +83,7 @@ if QB and QB.config and QB.config.adopt then
     Config.blipInfo.category = config.string(Config.blipInfo.category, {
         minLength = 1,
         label = 'Bank map category', advanced = true,
-        description = 'Named qblib map-legend category for bank markers; use a supported category name such as Bank. Restart qbbanking to apply saved changes.',
+        description = 'Named kora_lib map-legend category for bank markers; use a supported category name such as Bank. Restart qbbanking to apply saved changes.',
     })
     Config.blipInfo.sprite = config.integer(Config.blipInfo.sprite, {
         label = 'Bank map icon ID', advanced = true,
