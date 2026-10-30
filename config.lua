@@ -4,6 +4,8 @@ Config = {
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe' },
     atmDistance = 1.8,
     atmAccessTime = 1500,
+    dateFormat = 'locale',
+    showTime = true,
     useDailyLimit = true,
     dailyLimit = 5000,
     maxAccounts = 2,
@@ -45,6 +47,18 @@ if QB and QB.config and QB.config.adopt then
         min = 0,
         label = 'ATM access time (milliseconds)', advanced = false,
         description = 'Duration of the cancellable progress bar before opening an ATM. 1000 milliseconds equals 1 second. Restart qbbanking to apply saved changes.',
+    })
+    Config.dateFormat = config.enum(Config.dateFormat, {
+        options = {
+            { value = 'locale', label = 'Player locale' }, { value = 'DD/MM/YYYY', label = 'DD/MM/YYYY' },
+            { value = 'MM/DD/YYYY', label = 'MM/DD/YYYY' }, { value = 'YYYY-MM-DD', label = 'YYYY-MM-DD' },
+        },
+        label = 'Transaction date format', advanced = false,
+        description = 'How dates appear in the Activity table. locale follows the player locale (en-US shows MM/DD/YYYY, most others DD/MM/YYYY); the other values force that order for everyone. Applies the next time Activity is opened.',
+    })
+    Config.showTime = config.boolean(Config.showTime, {
+        label = 'Show time with transaction dates', advanced = false,
+        description = 'Appends the hour and minute to each transaction date in Activity. Turn off to show the date only. Applies the next time Activity is opened.',
     })
     Config.useDailyLimit = config.boolean(Config.useDailyLimit, {
         label = 'Limit daily ATM withdrawals', advanced = false,

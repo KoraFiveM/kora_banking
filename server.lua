@@ -205,10 +205,12 @@ local function accountRows(data, mode)
     return rows
 end
 
+-- Both halves of the UNION select the date as UNIX_TIMESTAMP(...)*1000 so the column type no longer depends on
+-- bank_statements (timestamp) versus bank_operation_legs (datetime) or on how the SQL driver returns dates.
 -- Both sides of the UNION pin the same collation: installs where bank_operation_legs was created
 -- with the server default (not banking.sql's utf8mb4_unicode_ci) otherwise fail with "Illegal mix of collations".
 local COLLATION = 'COLLATE utf8mb4_unicode_ci'
-local STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid, account_name %s AS account_name, amount, reason %s AS reason, statement_type %s AS statement_type, date'):format(COLLATION, COLLATION, COLLATION, COLLATION)
+local STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid, account_name %s AS account_name, amount, reason %s AS reason, statement_type %s AS statement_type, CAST(UNIX_TIMESTAMP(date) * 1000 AS UNSIGNED) AS date'):format(COLLATION, COLLATION, COLLATION, COLLATION)
 local LEG_ID = ("CONCAT('operation:',id) %s"):format(COLLATION)
 
 local function transactionRows(data, accountRowsList)
@@ -219,7 +221,7 @@ local function transactionRows(data, accountRowsList)
             local sql = 'SELECT ' .. STATEMENT_COLUMNS .. ' FROM bank_statements WHERE citizenid = ? AND account_name = ?'
             local params = { data.citizenid, 'checking' }
             if durableHistory then
-                sql = sql .. (' UNION ALL SELECT %s,citizenid %s,\'checking\' %s,amount,reason %s,direction %s,created_at FROM bank_operation_legs WHERE citizenid = ? ORDER BY date DESC,id DESC LIMIT 50')
+                sql = sql .. (' UNION ALL SELECT %s,citizenid %s,\'checking\' %s,amount,reason %s,direction %s,CAST(UNIX_TIMESTAMP(created_at) * 1000 AS UNSIGNED) FROM bank_operation_legs WHERE citizenid = ? ORDER BY date DESC,id DESC LIMIT 50')
                     :format(LEG_ID, COLLATION, COLLATION, COLLATION, COLLATION)
                 params[3] = data.citizenid
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
@@ -228,12 +230,14 @@ local function transactionRows(data, accountRowsList)
             local sql = 'SELECT ' .. STATEMENT_COLUMNS .. ' FROM bank_statements WHERE account_name = ?'
             local params = { account.name }
             if durableHistory then
-                sql = sql .. (' UNION ALL SELECT %s,citizenid %s,account_name %s,amount,reason %s,direction %s,created_at FROM bank_operation_legs WHERE account_name = ? ORDER BY date DESC,id DESC LIMIT 50')
+                sql = sql .. (' UNION ALL SELECT %s,citizenid %s,account_name %s,amount,reason %s,direction %s,CAST(UNIX_TIMESTAMP(created_at) * 1000 AS UNSIGNED) FROM bank_operation_legs WHERE account_name = ? ORDER BY date DESC,id DESC LIMIT 50')
                     :format(LEG_ID, COLLATION, COLLATION, COLLATION, COLLATION)
                 params[2] = account.name
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
             rows = QB.sql.query(sql, params) or {}
         end
+        -- Whatever the driver returns for the date column (number, string, table), the NUI gets Unix ms or nil.
+        for _, row in ipairs(rows) do row.date = BankingDates.normalize(row.date) end
         result[account.name] = rows
     end
     return result

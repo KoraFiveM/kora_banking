@@ -26,6 +26,7 @@ shared_scripts {
     '@kora_sql/init.lua',
     '@kora_core/init.lua',
     'config.lua',
+    'dates.lua',
 }
 
 client_scripts {

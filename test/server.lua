@@ -1,9 +1,11 @@
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local api, threads, legacyEvents = {}, {}, {}
+dofile(root .. 'dates.lua')
 local balance, statements = 1000, 0
 local statementResult, updateFails
 local function noop() end
 local env = setmetatable({
+    BankingDates = BankingDates,
     QB = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = {

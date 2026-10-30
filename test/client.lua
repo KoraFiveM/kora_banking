@@ -32,7 +32,7 @@ local bankSnapshot = {
         { name = 'checking', owner = 'Jamie', label = 'Personal', balance = 2400, type = 'checking' },
         { name = 'club', owner = 'Club Account', label = 'Shared', balance = 900, type = 'shared', canManage = true },
     },
-    transactions = { checking = { { id = 1, statement_type = 'deposit', amount = 125, reason = 'Pay', date = 'today' } } },
+    transactions = { checking = { { id = 1, statement_type = 'deposit', amount = 125, reason = 'Pay', date = 1793326800000 } } },
 }
 local lockedAtm = { mode = 'atm', locked = true, profile = { cash = 700 }, accounts = {}, limits = { daily = 5000, maxAccounts = 2 } }
 local unlockedAtm = {
@@ -85,6 +85,7 @@ _G.QB = {
 }
 
 dofile(root .. 'config.lua')
+dofile(root .. 'dates.lua')
 dofile(root .. 'client.lua')
 
 local passed = 0
@@ -130,6 +131,10 @@ equal(branchWithdraw.fields[2].description, 'Each account option shows its curre
     'branch withdrawal feedback remains accurate when the form account changes')
 local activity = tab(view(bank, 'accounts'), 'activity').content.blocks[1]
 truthy(activity.searchable and activity.pageSize == 10, 'activity is searchable and paged')
+truthy(activity.rows[1].date:match('^%d%d/%d%d/%d%d%d%d'), 'activity dates render as formatted dates, not table addresses')
+Config.dateFormat = 'YYYY-MM-DD'
+Config.showTime = false
+equal(BankingDates.format(1793326800000, { format = Config.dateFormat, showTime = Config.showTime, utc = true }), '2026-10-30', 'Config options drive the formatter')
 truthy(activity.rows[1].type.badge, 'transaction status uses a rich badge cell')
 local manageView = view(bank, 'manage')
 local sharedBlocks = tab(manageView, 'shared').content.blocks
