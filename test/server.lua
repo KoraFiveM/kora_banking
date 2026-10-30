@@ -118,3 +118,27 @@ threads[#threads]()
 _, openError = callbacks['qbbanking:open'](1, 'bank', 1)
 assert(logged and openError == 'Banking is still starting.', 'failed account creation must log and leave banking unready')
 print('qbbanking server: fresh organization-account bootstrap regression passed')
+
+-- Statement history UNIONs bank_statements with bank_operation_legs; installs where the legs table kept the
+-- server default collation must not raise "Illegal mix of collations", so every string column is pinned.
+local function readFile(path)
+    local file = assert(io.open(path, 'rb'))
+    local text = file:read('a')
+    file:close()
+    return text
+end
+local source = readFile(root .. 'server.lua')
+local collate = 'COLLATE utf8mb4_unicode_ci'
+assert(source:find("local COLLATION = '" .. collate .. "'", 1, true), 'history query must pin one collation')
+local legSelects = 0
+for select in source:gmatch("UNION ALL SELECT (.-) FROM bank_operation_legs") do
+    legSelects = legSelects + 1
+    assert(select:find('%%s,citizenid %%s', 1), 'leg select must collate citizenid')
+    assert(select:find('reason %%s,direction %%s', 1), 'leg select must collate reason and direction')
+end
+assert(legSelects == 2, 'both history queries must collate the operation-leg side')
+assert(source:find("STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid", 1, true)
+    and source:find('reason %s AS reason, statement_type %s AS statement_type', 1, true), 'statement side must be collated too')
+assert(readFile(root .. 'sql/002_operation_legs_collation.sql'):find('CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', 1, true), 'migration must align bank_operation_legs')
+assert(readFile(root .. 'server/finance.lua'):find('002_operation_legs_collation.sql', 1, true), 'migration must be registered')
+print('qbbanking server: statement UNION collation regression passed')

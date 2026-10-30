@@ -236,7 +236,10 @@ end
 local function bootstrap()
     local available = QB.sql.ready(60000)
     if not available then QB.timers.setTimeout(bootstrap, 30000); return end
-    local migrated, err = QB.sql.migrateFiles(GetCurrentResourceName(), { { version = 1, name = 'durable_operations', file = 'sql/001_durable_operations.sql' } })
+    local migrated, err = QB.sql.migrateFiles(GetCurrentResourceName(), {
+        { version = 1, name = 'durable_operations', file = 'sql/001_durable_operations.sql' },
+        { version = 2, name = 'operation_legs_collation', file = 'sql/002_operation_legs_collation.sql' },
+    })
     if not migrated then return print(('[qbbanking] durable banking migration failed: %s'):format(tostring(err))) end
     local settled, waitErr = QB.sql.awaitCheckedOperations('qbcore:fence:qbbanking:')
     if not settled then
