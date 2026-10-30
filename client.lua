@@ -153,6 +153,10 @@ local function appDefinition()
     local accountSelect = accountOptions(accounts)
     local managedAccounts = managedAccountOptions(accounts)
     local managedItems = managedAccountItems(accounts)
+    local minimums = snapshot.limits and snapshot.limits.min or {}
+    local minWithdraw = math.max(1, tonumber(minimums.withdraw) or 1)
+    local minDeposit = math.max(1, tonumber(minimums.deposit) or 1)
+    local minTransfer = math.max(1, tonumber(minimums.transfer) or 1)
     local atmDailyRemaining = snapshot.mode == 'atm' and snapshot.limits and tonumber(snapshot.limits.daily) or nil
     local cardItems = {}
     for _, card in ipairs(snapshot.profile.cards or {}) do
@@ -178,28 +182,28 @@ local function appDefinition()
     local cashActions = {
         {
             id = 'banking:withdraw', label = 'Withdraw cash', icon = 'dollar-sign', variant = 'primary',
-            disabled = snapshot.mode == 'atm' and (not selected or (tonumber(selected.balance) or 0) < 1
-                or (atmDailyRemaining ~= nil and atmDailyRemaining < 1)),
+            disabled = snapshot.mode == 'atm' and (not selected or (tonumber(selected.balance) or 0) < minWithdraw
+                or (atmDailyRemaining ~= nil and atmDailyRemaining < minWithdraw)),
             fields = {
                 { id = 'account', label = 'From account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
-                { id = 'amount', label = 'Amount', type = 'number', min = 1,
-                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= 1
+                { id = 'amount', label = 'Amount', type = 'number', min = minWithdraw,
+                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= minWithdraw
                         and (atmDailyRemaining == nil and selected.balance or math.min(tonumber(selected.balance), atmDailyRemaining)) or nil,
                     required = true, placeholder = '0', presets = amountPresets(),
                     description = snapshot.mode == 'atm' and selected and (money(selected.balance) .. ' available in this account')
-                        or 'Each account option shows its current available balance.' },
+                        or 'Each account option shows its current available balance.' .. (minWithdraw > 1 and (' Minimum withdrawal: ' .. money(minWithdraw) .. '.') or '') },
                 { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
             },
         },
         {
             id = 'banking:deposit', label = 'Deposit cash', icon = 'dollar-sign', variant = 'secondary',
-            disabled = (tonumber(snapshot.profile.cash) or 0) < 1,
+            disabled = (tonumber(snapshot.profile.cash) or 0) < minDeposit,
             fields = {
                 { id = 'account', label = 'To account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
-                { id = 'amount', label = 'Amount', type = 'number', min = 1,
-                    max = (tonumber(snapshot.profile.cash) or 0) >= 1 and tonumber(snapshot.profile.cash) or nil,
+                { id = 'amount', label = 'Amount', type = 'number', min = minDeposit,
+                    max = (tonumber(snapshot.profile.cash) or 0) >= minDeposit and tonumber(snapshot.profile.cash) or nil,
                     required = true, placeholder = '0', presets = amountPresets(),
-                    description = money(snapshot.profile.cash) .. ' cash available' },
+                    description = money(snapshot.profile.cash) .. ' cash available' .. (minDeposit > 1 and (' Minimum deposit: ' .. money(minDeposit) .. '.') or '') },
                 { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
             },
         },
@@ -282,8 +286,8 @@ local function appDefinition()
                         fields = {
                             { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                             { id = 'to', label = 'To', type = 'select', options = accountSelect, required = true },
-                            { id = 'amount', label = 'Amount', type = 'number', min = 1, required = true,
-                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' },
+                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') },
                             { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
                         },
                     },
@@ -300,8 +304,8 @@ local function appDefinition()
                         fields = {
                             { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                             { id = 'recipient', label = 'Recipient account number', type = 'text', required = true, minLength = 1 },
-                            { id = 'amount', label = 'Amount', type = 'number', min = 1, required = true,
-                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' },
+                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') },
                             { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
                         },
                     },

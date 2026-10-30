@@ -182,6 +182,24 @@ truthy(rejectedWithdrawal and next(rejectedWithdrawal) == nil, 'a rejected ATM w
 equal(notifications[#notifications].message, actionError, 'an ATM limit rejection is shown in the banking toast')
 actionError = nil
 
+-- Configured minimums reach the form inputs and helper text; defaults keep min = 1.
+bankSnapshot.profile.cash = 700
+bankSnapshot.limits = { min = { withdraw = 5, deposit = 6, transfer = 7 } }
+branchOptions[1].onSelect()
+local minBank = apps[#apps]
+local minWithdraw = tab(view(minBank, 'cash'), 'withdraw').content.actions[1]
+equal(minWithdraw.fields[2].min, 5, 'withdraw input shows the configured minimum')
+truthy(minWithdraw.fields[2].description:find('Minimum withdrawal: $5', 1, true), 'withdraw helper text states the minimum')
+equal(tab(view(minBank, 'cash'), 'deposit').content.actions[1].fields[2].min, 6, 'deposit input shows the configured minimum')
+local minTransfers = view(minBank, 'transfer').tabs
+equal(minTransfers[1].content.actions[1].fields[3].min, 7, 'internal transfer input shows the configured minimum')
+equal(minTransfers[2].content.actions[1].fields[3].min, 7, 'player transfer input shows the configured minimum')
+bankSnapshot.limits = nil
+branchOptions[1].onSelect()
+local defaultBank = apps[#apps]
+equal(tab(view(defaultBank, 'cash'), 'withdraw').content.actions[1].fields[2].min, 1, 'default withdraw minimum stays 1')
+equal(tab(view(defaultBank, 'cash'), 'deposit').content.actions[1].fields[2].min, 1, 'default deposit minimum stays 1')
+
 bankSnapshot.profile.cash = 0
 branchOptions[1].onSelect()
 local emptyDeposit = tab(view(apps[#apps], 'cash'), 'deposit').content.actions[1]

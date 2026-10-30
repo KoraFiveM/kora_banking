@@ -8,6 +8,7 @@ Config = {
     showTime = true,
     useDailyLimit = true,
     dailyLimit = 5000,
+    minAmount = { withdraw = 1, deposit = 1, transfer = 1 },
     maxAccounts = 2,
     maxSharedMembers = 10,
     maxSharedMemberBytes = 512,
@@ -68,6 +69,21 @@ if QB and QB.config and QB.config.adopt then
         min = 0,
         label = 'Daily ATM allowance ($)', advanced = false,
         description = 'Maximum personal-account withdrawals per character since midnight on the database clock when daily limits are enabled. Bank-counter withdrawals also count toward this allowance. Restart qbbanking to apply saved changes.',
+    })
+    Config.minAmount.withdraw = config.integer(Config.minAmount.withdraw, {
+        min = 1,
+        label = 'Minimum withdrawal ($)', advanced = false,
+        description = 'Smallest amount a player may withdraw (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
+    })
+    Config.minAmount.deposit = config.integer(Config.minAmount.deposit, {
+        min = 1,
+        label = 'Minimum deposit ($)', advanced = false,
+        description = 'Smallest amount a player may deposit (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
+    })
+    Config.minAmount.transfer = config.integer(Config.minAmount.transfer, {
+        min = 1,
+        label = 'Minimum transfer ($)', advanced = false,
+        description = 'Smallest amount a player may transfer (between own accounts and to other players). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
     })
     Config.maxAccounts = config.integer(Config.maxAccounts, {
         min = 0,

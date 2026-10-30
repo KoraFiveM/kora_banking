@@ -29,6 +29,20 @@ local function roundAmount(value)
     return amount
 end
 
+local MIN_LABELS = { withdraw = 'withdrawal', deposit = 'deposit', transfer = 'transfer' }
+
+-- Read at use time so live config changes apply immediately; anything invalid falls back to 1.
+local function minimumAmount(kind)
+    local value = type(Config.minAmount) == 'table' and tonumber(Config.minAmount[kind]) or 1
+    if not value or value ~= value or value < 1 then return 1 end
+    return math.floor(value)
+end
+
+local function belowMinimum(kind, amount)
+    local minimum = minimumAmount(kind)
+    if amount < minimum then return ('Minimum %s is $%d.'):format(MIN_LABELS[kind], minimum) end
+end
+
 local function cleanText(value, fallback, maxLength)
     return QB.util.cleanText(value, {
         maxLength = maxLength or 50,
@@ -263,7 +277,8 @@ local function snapshot(src, mode, unlocked)
         },
         accounts = unlocked == false and {} or list,
         transactions = unlocked == false and {} or transactionRows(data, list),
-        limits = { daily = Config.useDailyLimit and dailyWithdrawalRemaining(data) or nil, maxAccounts = Config.maxAccounts },
+        limits = { daily = Config.useDailyLimit and dailyWithdrawalRemaining(data) or nil, maxAccounts = Config.maxAccounts,
+            min = { withdraw = minimumAmount('withdraw'), deposit = minimumAmount('deposit'), transfer = minimumAmount('transfer') } },
     }
 end
 
@@ -360,6 +375,8 @@ local function transactCash(src, data, current, payload)
     if not account then return nil, 'You cannot use that account.' end
     if current.mode == 'atm' and account.account_name ~= 'checking' then return nil, 'ATMs only support your personal account.' end
     local reason = cleanText(payload.reason, payload.kind == 'deposit' and 'Cash deposit' or 'Cash withdrawal', 50)
+    local tooSmall = belowMinimum(payload.kind == 'deposit' and 'deposit' or 'withdraw', amount)
+    if tooSmall then return nil, tooSmall end
 
     if payload.kind == 'deposit' then
         if (tonumber(data.money.cash) or 0) < amount then return nil, 'You do not have that much cash.' end
@@ -392,6 +409,8 @@ local function transfer(src, data, payload)
     local from = sourceAccount(data, payload.from)
     if not from then return nil, 'You cannot use the source account.' end
     local reason = cleanText(payload.reason, 'Bank transfer', 50)
+    local tooSmall = belowMinimum('transfer', amount)
+    if tooSmall then return nil, tooSmall end
 
     if payload.to then
         local destination = sourceAccount(data, payload.to)

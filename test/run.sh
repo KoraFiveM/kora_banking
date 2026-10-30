@@ -6,3 +6,4 @@ lua test/contracts.lua
 lua test/server.lua
 lua test/finance.lua
 lua test/dates.lua
+lua test/minamount.lua
