@@ -79,17 +79,17 @@ if QB and QB.config and QB.config.adopt then
     Config.minAmount.withdraw = config.integer(Config.minAmount.withdraw, {
         min = 1,
         label = 'Minimum withdrawal ($)', advanced = false,
-        description = 'Smallest amount a player may withdraw (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
+        description = 'Smallest amount a player may withdraw (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour; set it to 5 for a $5 minimum. Applies immediately.',
     })
     Config.minAmount.deposit = config.integer(Config.minAmount.deposit, {
         min = 1,
         label = 'Minimum deposit ($)', advanced = false,
-        description = 'Smallest amount a player may deposit (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
+        description = 'Smallest amount a player may deposit (bank counter and ATM). Enforced by the server and shown in the input. 1 keeps the previous behaviour; set it to 5 for a $5 minimum. Applies immediately.',
     })
     Config.minAmount.transfer = config.integer(Config.minAmount.transfer, {
         min = 1,
         label = 'Minimum transfer ($)', advanced = false,
-        description = 'Smallest amount a player may transfer (between own accounts and to other players). Enforced by the server and shown in the input. 1 keeps the previous behaviour. Applies immediately.',
+        description = 'Smallest amount a player may transfer (between own accounts and to other players). Enforced by the server and shown in the input. 1 keeps the previous behaviour; set it to 5 for a $5 minimum. Applies immediately.',
     })
     Config.maxAccounts = config.integer(Config.maxAccounts, {
         min = 0,

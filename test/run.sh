@@ -7,3 +7,4 @@ lua test/server.lua
 lua test/finance.lua
 lua test/dates.lua
 lua test/minamount.lua
+lua test/minamount_docs.lua
