@@ -109,8 +109,9 @@ local function activityRows()
             type = { label = deposit and 'Deposit' or 'Withdrawal', badge = true, tone = deposit and 'success' or 'neutral' },
             amount = { label = (deposit and '+' or '-') .. money(transaction.amount), tone = deposit and 'success' or 'neutral' },
             reason = transaction.reason or (deposit and 'Deposit' or 'Withdrawal'),
-            date = BankingDates.format(transaction.date, {
+            date = BankingDates.safeFormat(transaction.date, {
                 format = Config.dateFormat, showTime = Config.showTime,
+                offset = Config.dateTimezone == 'utc' and 0 or BankingDates.localOffset(),
                 locale = GetConvar and GetConvar('locale', 'en-US') or 'en-US',
             }),
         }

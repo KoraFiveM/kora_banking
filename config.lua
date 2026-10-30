@@ -6,6 +6,7 @@ Config = {
     atmAccessTime = 1500,
     dateFormat = 'locale',
     showTime = true,
+    dateTimezone = 'local',
     useDailyLimit = true,
     dailyLimit = 5000,
     minAmount = { withdraw = 1, deposit = 1, transfer = 1 },
@@ -60,6 +61,11 @@ if QB and QB.config and QB.config.adopt then
     Config.showTime = config.boolean(Config.showTime, {
         label = 'Show time with transaction dates', advanced = false,
         description = 'Appends the hour and minute to each transaction date in Activity. Turn off to show the date only. Applies the next time Activity is opened.',
+    })
+    Config.dateTimezone = config.enum(Config.dateTimezone, {
+        options = { { value = 'local', label = 'Player local time' }, { value = 'utc', label = 'UTC' } },
+        label = 'Transaction date timezone', advanced = false,
+        description = 'Timezone used for Activity dates. local uses the clock offset of each player machine; utc shows the same time for everyone. Applies the next time Activity is opened.',
     })
     Config.useDailyLimit = config.boolean(Config.useDailyLimit, {
         label = 'Limit daily ATM withdrawals', advanced = false,

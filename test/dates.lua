@@ -1,3 +1,6 @@
+-- The FiveM client has no os library; every assertion below must pass without it.
+local realOs = os
+os = nil
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 dofile(root .. 'dates.lua')
 local D = BankingDates
@@ -19,7 +22,7 @@ equal(D.normalize(0), nil, 'zero')
 equal(D.normalize(0 / 0), nil, 'nan')
 
 -- format (utc keeps the test timezone independent)
-local function fmt(o) o.utc = true return D.format(ms, o) end
+local function fmt(o) return D.format(ms, o) end
 equal(fmt({ format = 'DD/MM/YYYY' }), '30/10/2026 02:20', 'DD/MM/YYYY')
 equal(fmt({ format = 'MM/DD/YYYY' }), '10/30/2026 02:20', 'MM/DD/YYYY')
 equal(fmt({ format = 'YYYY-MM-DD' }), '2026-10-30 02:20', 'YYYY-MM-DD')
@@ -32,6 +35,22 @@ equal(fmt({ format = 'locale', locale = 'ja-JP' }), '2026-10-30 02:20', 'locale 
 equal(fmt({ format = 'locale', locale = 'en-US', showTime = false }), '10/30/2026', 'locale date only')
 equal(D.format({}, {}), 'Recently', 'invalid falls back')
 equal(D.format('x', { fallback = '-' }), '-', 'custom fallback')
+equal(fmt({ format = 'YYYY-MM-DD', offset = -5 * 3600 }), '2026-10-29 21:20', 'negative offset crosses day')
+equal(fmt({ format = 'YYYY-MM-DD', offset = 5.5 * 3600 }), '2026-10-30 07:50', 'half-hour offset')
+equal(D.format(951782400000, { format = 'YYYY-MM-DD' }), '2000-02-29 00:00', 'leap day')
+equal(D.format(100000000000, { format = "YYYY-MM-DD" }), "1973-03-03 09:46", "1973")
+equal(D.safeFormat(ms, { format = 'YYYY-MM-DD', showTime = false }), '2026-10-30', 'safeFormat passes through')
+equal(D.safeFormat('x'), 'Recently', 'safeFormat fallback')
+local original = D.format
+D.format = function() error('boom') end
+equal(D.safeFormat(ms), '2026-10-30T02:20:00Z', 'safeFormat falls back to ISO when format throws')
+D.format = original
+equal(D.localOffset(), 0, 'localOffset is 0 without natives')
+_G.GetLocalTime = function() return 2026, 10, 29, 21, 20, 0 end
+_G.GetCloudTimeAsInt = function() return ms // 1000 end
+equal(D.localOffset(), -5 * 3600, 'localOffset from natives')
+_G.GetLocalTime, _G.GetCloudTimeAsInt = nil, nil
+os = realOs
 -- Both UNION halves must project the date as Unix milliseconds, whatever the table column type.
 local source = assert(io.open(root .. 'server.lua')):read('a')
 local _, halves = source:gsub('CAST%(UNIX_TIMESTAMP%(', '')

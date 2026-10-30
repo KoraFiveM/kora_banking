@@ -1,3 +1,6 @@
+-- The FiveM client has no os library.
+local realOs = os
+os = nil
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
 local notifications = {}

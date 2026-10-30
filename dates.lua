@@ -1,4 +1,5 @@
 -- Date helpers shared by the banking server (normalise) and client (format).
+-- The FiveM client Lua runtime has no `os` library, so nothing in this file may touch `os`.
 -- Transaction dates travel as Unix milliseconds so every source table and driver return type renders the same.
 BankingDates = {}
 
@@ -39,6 +40,42 @@ function BankingDates.normalize(value)
     return nil
 end
 
+-- Inverse of days-from-civil: days since 1970-01-01 -> year, month, day.
+local function civilFromDays(days)
+    days = days + 719468
+    local era = (days >= 0 and days or days - 146096) // 146097
+    local doe = days - era * 146097
+    local yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+    local doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+    local mp = (5 * doy + 2) // 153
+    local d = doy - (153 * mp + 2) // 5 + 1
+    local m = mp < 10 and mp + 3 or mp - 9
+    return yoe + era * 400 + (m <= 2 and 1 or 0), m, d
+end
+
+-- Breaks Unix milliseconds (plus a timezone offset in seconds) into calendar fields without `os`.
+function BankingDates.fields(ms, offsetSeconds)
+    local seconds = ms // 1000 + (tonumber(offsetSeconds) or 0)
+    local days, rest = seconds // 86400, seconds % 86400
+    local year, month, day = civilFromDays(days)
+    return { year = year, month = month, day = day, hour = rest // 3600, min = rest % 3600 // 60, sec = rest % 60 }
+end
+
+-- Client only: the UTC offset in seconds of the player machine (0 when natives are missing or unsynced).
+function BankingDates.localOffset()
+    local ok, offset = pcall(function()
+        local localTime, cloudTime = rawget(_G, 'GetLocalTime'), rawget(_G, 'GetCloudTimeAsInt')
+        if type(localTime) ~= 'function' or type(cloudTime) ~= 'function' then return 0 end
+        local y, mo, d, h, mi, s = localTime()
+        local asUtc = utcMillis(y, mo, d, h, mi, s)
+        local utc = tonumber(cloudTime())
+        if not asUtc or not utc or utc <= 0 then return 0 end
+        local diff = math.floor((asUtc // 1000 - utc) / 900 + 0.5) * 900
+        return math.abs(diff) <= 14 * 3600 and diff or 0
+    end)
+    return ok and tonumber(offset) or 0
+end
+
 local LOCALE_LAYOUT = { us = 'MM/DD/YYYY', ca = 'MM/DD/YYYY', ph = 'MM/DD/YYYY' }
 local ISO_LANGUAGES = { ja = true, zh = true, ko = true, hu = true, sv = true, lt = true }
 
@@ -52,13 +89,13 @@ function BankingDates.resolvePattern(format, locale)
     return 'DD/MM/YYYY'
 end
 
--- options: { format = Config.dateFormat, showTime = Config.showTime, locale = 'en-US', fallback = 'Recently' }
+-- options: { offset = seconds east of UTC (default 0), format = Config.dateFormat, showTime = Config.showTime, locale = 'en-US', fallback = 'Recently' }
 function BankingDates.format(value, options)
     options = options or {}
     local ms = BankingDates.normalize(value)
     if not ms then return options.fallback or 'Recently' end
     local pattern = BankingDates.resolvePattern(options.format, options.locale)
-    local t = os.date(options.utc and '!*t' or '*t', ms // 1000)
+    local t = BankingDates.fields(ms, options.offset)
     local text = pattern:gsub('YYYY', ('%04d'):format(t.year)):gsub('MM', ('%02d'):format(t.month)):gsub('DD', ('%02d'):format(t.day))
     if options.showTime == false then return text end
     local twelve = options.hour12
@@ -67,4 +104,18 @@ function BankingDates.format(value, options)
         return ('%s %d:%02d %s'):format(text, (t.hour + 11) % 12 + 1, t.min, t.hour < 12 and 'AM' or 'PM')
     end
     return ('%s %02d:%02d'):format(text, t.hour, t.min)
+end
+
+-- Never throws: a formatting problem must not stop the bank from opening.
+function BankingDates.safeFormat(value, options)
+    local ok, text = pcall(BankingDates.format, value, options)
+    if ok and type(text) == 'string' then return text end
+    local fallback = type(options) == 'table' and options.fallback or 'Recently'
+    local isoOk, iso = pcall(function()
+        local ms = BankingDates.normalize(value)
+        if not ms then return nil end
+        local t = BankingDates.fields(ms, 0)
+        return ('%04d-%02d-%02dT%02d:%02d:%02dZ'):format(t.year, t.month, t.day, t.hour, t.min, t.sec)
+    end)
+    return isoOk and iso or fallback
 end
