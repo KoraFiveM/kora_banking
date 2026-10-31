@@ -15,7 +15,7 @@ local appOpen = false
 local branchTargetIds = {}
 
 local function notify(message, kind)
-    QB.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
+    Kora.notify.send({ title = 'Banking', message = message, type = kind or 'error' })
 end
 
 -- Keep banking's request transport independent from kora_lib's callback
@@ -428,7 +428,7 @@ local function refreshApp()
             local snapshot, err = request('pin', values.pin)
             if not snapshot then
                 local message = err or 'Invalid PIN.'
-                if QB.notify and QB.notify.send then notify(message) end
+                if Kora.notify and Kora.notify.send then notify(message) end
                 return { notice = { tone = 'destructive', message = message } }
             end
             currentSnapshot = snapshot
@@ -475,7 +475,7 @@ local function refreshApp()
         if not accountByName(selectedAccount) then selectedAccount = 'checking' end
         return { update = appUpdate(), notice = result.message and { tone = 'success', message = result.message } or nil }
     end
-    QB.nui.registerApp(definition)
+    Kora.nui.registerApp(definition)
 end
 
 local function closeSession()
@@ -494,7 +494,7 @@ local function open(mode, location)
         selectedAccount = 'checking'
         appOpen = true
         refreshApp()
-        local result = QB.nui.openApp(APP_ID, { viewId = snapshot.locked and 'unlock' or 'accounts' })
+        local result = Kora.nui.openApp(APP_ID, { viewId = snapshot.locked and 'unlock' or 'accounts' })
         closeSession()
         if result == nil then notify('The banking interface could not be opened.') end
     end)
@@ -515,7 +515,7 @@ local function accessAtm()
 
     openingAtm = true
     CreateThread(function()
-        local completed = QB.progressbar.start({
+        local completed = Kora.progressbar.start({
             label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
             disable = { move = true, combat = true, car = true },
             anim = { dict = 'amb@prop_human_atm@male@enter', clip = 'enter' },
@@ -566,7 +566,7 @@ AddEventHandler('onClientResourceStart', function(resource)
 end)
 
 for _, coords in ipairs(Config.locations) do
-    QB.blips.create(coords, Config.blipInfo)
+    Kora.blips.create(coords, Config.blipInfo)
 end
 
 RegisterNetEvent('qbbanking:client:useCard', accessAtm)

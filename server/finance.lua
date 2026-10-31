@@ -34,7 +34,7 @@ local function playerValues(ids)
     if #ids == 0 then return result end
     local placeholders = {}
     for i = 1, #ids do placeholders[i] = '?' end
-    local rows, err = QB.sql.query('SELECT `citizenid`,`money` FROM `players` WHERE `deleted_at` IS NULL AND `citizenid` IN (' .. table.concat(placeholders, ',') .. ')', ids)
+    local rows, err = Kora.sql.query('SELECT `citizenid`,`money` FROM `players` WHERE `deleted_at` IS NULL AND `citizenid` IN (' .. table.concat(placeholders, ',') .. ')', ids)
     if not rows then return nil, err end
     for _, row in ipairs(rows) do
         local money = decode(row.money)
@@ -60,14 +60,14 @@ end
 local function receipt(resource, key, expectedRequest)
     -- A stopped caller can leave its old driver worker running before it has
     -- acquired the receipt row. Join it before treating an absent receipt as safe.
-    local settled, waitErr = QB.sql.awaitCheckedOperation('qbbanking:' .. operationId(resource, key), expectedRequest)
+    local settled, waitErr = Kora.sql.awaitCheckedOperation('qbbanking:' .. operationId(resource, key), expectedRequest)
     if not settled then return nil, 'unavailable', waitErr end
     if settled.active and settled.result and settled.result.code == 'indeterminate' then
         return nil, 'indeterminate', settled.result.message
     end
     -- A locking read also waits for a receipt INSERT left at the database by
     -- a restarted SQL host, whose in-memory worker registry no longer exists.
-    local read, err = QB.sql.transactionChecked({ { query = 'SELECT `request`,`receipt` FROM `bank_operations` WHERE `resource`=? AND `operation_key`=? FOR UPDATE', values = { resource, key } } })
+    local read, err = Kora.sql.transactionChecked({ { query = 'SELECT `request`,`receipt` FROM `bank_operations` WHERE `resource`=? AND `operation_key`=? FOR UPDATE', values = { resource, key } } })
     if not read or not read.success or not read.results or type(read.results[1]) ~= 'table' then return nil, 'unavailable', err or 'Banking receipt lookup could not be confirmed.' end
     local row = read.results[1][1]
     if not row then return nil, 'not_found' end
@@ -159,11 +159,11 @@ local function execute(resource, key, request, fingerprint)
     for index, leg in ipairs(prepared.legs) do
         statements[#statements + 1] = { query = [[INSERT INTO `bank_operation_legs`
             (`resource`,`operation_key`,`leg`,`citizenid`,`account_name`,`direction`,`amount`,`reason`) VALUES (?,?,?,?,?,?,?,?)]],
-            values = { resource, key, index, leg.citizenid or QB.sql.NULL, leg.account or QB.sql.NULL, leg.direction, leg.amount,
+            values = { resource, key, index, leg.citizenid or Kora.sql.NULL, leg.account or Kora.sql.NULL, leg.direction, leg.amount,
                 type(request.reason) == 'string' and request.reason:sub(1, 50) or 'Housing transaction' }, expectedRows = 1 }
     end
     for _, statement in ipairs(request.statements or {}) do statements[#statements + 1] = statement end
-    local outcome, transactionErr = QB.sql.transactionChecked(statements, { key = 'qbbanking:' .. operationId(resource, key), fingerprint = fingerprint, citizenids = prepared.ids })
+    local outcome, transactionErr = Kora.sql.transactionChecked(statements, { key = 'qbbanking:' .. operationId(resource, key), fingerprint = fingerprint, citizenids = prepared.ids })
     if not outcome or not outcome.success then
         if outcome and outcome.code ~= 'indeterminate' then
             local found, foundCode, foundErr = receipt(resource, key, fingerprint)
@@ -230,7 +230,7 @@ local function recoverOperations()
             end
         end
     end
-    if pending and not recoveryTimer then recoveryTimer = QB.timers.setTimeout(recoverOperations, 30000) end
+    if pending and not recoveryTimer then recoveryTimer = Kora.timers.setTimeout(recoverOperations, 30000) end
 end
 
 local LEGS_TABLE, LEGS_COLLATION = 'bank_operation_legs', 'utf8mb4_unicode_ci'
@@ -238,29 +238,29 @@ local LEGS_TABLE, LEGS_COLLATION = 'bank_operation_legs', 'utf8mb4_unicode_ci'
 -- kora_sql only accepts CREATE TABLE IF NOT EXISTS / ALTER ... ADD IF NOT EXISTS in migration files, so the
 -- idempotent collation conversion lives here, guarded by information_schema (runs every boot, no-op once aligned).
 local function alignLegsCollation()
-    local mismatched, err = QB.sql.scalar([[SELECT
+    local mismatched, err = Kora.sql.scalar([[SELECT
         (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? AND table_collation <> ?)
         + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND collation_name IS NOT NULL AND collation_name <> ?)]],
         { LEGS_TABLE, LEGS_COLLATION, LEGS_TABLE, LEGS_COLLATION })
     if mismatched == nil then return false, err or 'collation check returned no result' end
     if (tonumber(mismatched) or 0) == 0 then return true end
-    local _, alterErr = QB.sql.execute(('ALTER TABLE `%s` CONVERT TO CHARACTER SET utf8mb4 COLLATE %s'):format(LEGS_TABLE, LEGS_COLLATION))
+    local _, alterErr = Kora.sql.execute(('ALTER TABLE `%s` CONVERT TO CHARACTER SET utf8mb4 COLLATE %s'):format(LEGS_TABLE, LEGS_COLLATION))
     if alterErr then return false, alterErr end
     print(('[qbbanking] converted %s to %s'):format(LEGS_TABLE, LEGS_COLLATION))
     return true
 end
 
 local function bootstrap()
-    local available = QB.sql.ready(60000)
-    if not available then QB.timers.setTimeout(bootstrap, 30000); return end
-    local migrated, err = QB.sql.migrateFiles(GetCurrentResourceName(), {
+    local available = Kora.sql.ready(60000)
+    if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
+    local migrated, err = Kora.sql.migrateFiles(GetCurrentResourceName(), {
         { version = 1, name = 'durable_operations', file = 'sql/001_durable_operations.sql' },
         { version = 2, name = 'operation_legs_collation', file = 'sql/002_operation_legs_collation.sql' },
     })
     if not migrated then
         print(('[qbbanking] durable banking migration failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
         local retry = tonumber(Config.migrationRetrySeconds) or 0
-        if retry > 0 then QB.timers.setTimeout(bootstrap, retry * 1000) end
+        if retry > 0 then Kora.timers.setTimeout(bootstrap, retry * 1000) end
         return
     end
     local aligned, alignErr = alignLegsCollation()
@@ -268,10 +268,10 @@ local function bootstrap()
         -- History queries pin the collation per column, so a failed conversion is not fatal.
         print(('[qbbanking] could not align %s collation (continuing): %s'):format(LEGS_TABLE, tostring(alignErr)))
     end
-    local settled, waitErr = QB.sql.awaitCheckedOperations('qbcore:fence:qbbanking:')
+    local settled, waitErr = Kora.sql.awaitCheckedOperations('qbcore:fence:qbbanking:')
     if not settled then
         print(('[qbbanking] player operation recovery deferred: %s'):format(tostring(waitErr)))
-        QB.timers.setTimeout(bootstrap, 30000)
+        Kora.timers.setTimeout(bootstrap, 30000)
         return
     end
     recoverOperations()
@@ -280,7 +280,7 @@ local function bootstrap()
 end
 
 AddEventHandler('onResourceStop', function(resource)
-    if resource == GetCurrentResourceName() and recoveryTimer then QB.timers.clearTimeout(recoveryTimer) end
+    if resource == GetCurrentResourceName() and recoveryTimer then Kora.timers.clearTimeout(recoveryTimer) end
 end)
 
 CreateThread(bootstrap)

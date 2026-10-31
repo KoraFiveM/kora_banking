@@ -66,7 +66,7 @@ _G.exports = {
     },
 }
 
-_G.QB = {
+_G.Kora = {
     blips = {
         create = function(coords, options)
             createdBlips[#createdBlips + 1] = { coords = coords, options = options }

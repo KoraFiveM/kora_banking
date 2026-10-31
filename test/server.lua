@@ -6,7 +6,7 @@ local statementResult, updateFails
 local function noop() end
 local env = setmetatable({
     BankingDates = BankingDates,
-    QB = {
+    Kora = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = {
             isFiniteNumber = function(n) return type(n) == 'number' and n == n and math.abs(n) < math.huge end,
@@ -40,7 +40,7 @@ local env = setmetatable({
     GetGameTimer = function() return 0 end,
     CreateThread = function(fn) threads[#threads + 1] = fn end,
 }, { __index = _G })
-env.QB.compat = assert(loadfile(root .. '../kora_lib/compat/provider.lua', 't', env))()()
+env.Kora.compat = assert(loadfile(root .. '../kora_lib/compat/provider.lua', 't', env))()()
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[1]()
 
@@ -90,16 +90,16 @@ print('qbbanking server: balance outcomes and history failure regression passed'
 
 local callbacks, created = {}, {}
 env.Config = { locations = {} }
-env.QB.callback.register = function(name, fn) callbacks[name] = fn end
-env.QB.shared.all = function(kind)
+env.Kora.callback.register = function(name, fn) callbacks[name] = fn end
+env.Kora.shared.all = function(kind)
     return kind == 'jobs' and { { name = 'unemployed' }, { name = 'police' } }
         or { { name = 'none' }, { name = 'ballas' } }
 end
-env.QB.sql.query = function() return {} end
-env.QB.sql.single = function(sql, params)
+env.Kora.sql.query = function() return {} end
+env.Kora.sql.single = function(sql, params)
     return params and created[params[1]] or nil
 end
-env.QB.sql.insert = function(_, params)
+env.Kora.sql.insert = function(_, params)
     local name = params[2]
     created[name] = { account_name = name, account_balance = params[3], account_type = params[4] }
     return 1
@@ -114,7 +114,7 @@ assert(openError == 'Move closer to a bank counter.', 'successful organization b
 
 local logged = false
 env.print = function(message) logged = message:find('account creation failed', 1, true) ~= nil end
-env.QB.sql.insert = function() return nil, 'controlled account creation failure' end
+env.Kora.sql.insert = function() return nil, 'controlled account creation failure' end
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[#threads]()
 _, openError = callbacks['qbbanking:open'](1, 'bank', 1)

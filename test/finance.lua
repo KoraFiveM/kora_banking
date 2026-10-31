@@ -82,7 +82,7 @@ local function boot()
     end
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.json, env.Config, env.QB = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
+    env.json, env.Config, env.Kora = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
     env.exports = setmetatable({ kora_core = core }, { __call = function(_, name, fn) api[name] = fn end })
     env.GetInvokingResource = function() return caller end
     env.GetCurrentResourceName = function() return 'kora_banking' end

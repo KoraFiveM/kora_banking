@@ -14,7 +14,7 @@ local function check(value, message) assert(value, message); passed = passed + 1
 
 local env = setmetatable({
     Config = { locations = { here }, dailyLimit = 100000, useDailyLimit = false, atmDistance = 2 },
-    QB = {
+    Kora = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = { isFiniteNumber = function(n) return type(n) == 'number' and n == n and math.abs(n) < math.huge end,
             cleanText = function(s) return s end },
@@ -41,7 +41,7 @@ local env = setmetatable({
 }, { __index = _G })
 -- exports.kora_core:fn(...) passes the table as first argument; mimic with colon-call semantics
 for _, fn in pairs(env.exports.kora_core) do assert(type(fn) == 'function') end
-env.QB.compat = { provideExport = noop }
+env.Kora.compat = { provideExport = noop }
 assert(loadfile(root .. 'server.lua', 't', env))()
 for _, thread in ipairs(threads) do thread() end
 

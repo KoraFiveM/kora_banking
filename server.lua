@@ -5,8 +5,8 @@ local ready = false
 local durableHistory = false
 AddEventHandler('qbbanking:durableReady', function() durableHistory = true end)
 
-if not QB.shared.get('items', 'bank_card') then
-    local itemRegistered, itemError = QB.shared.register('items', 'bank_card', {
+if not Kora.shared.get('items', 'bank_card') then
+    local itemRegistered, itemError = Kora.shared.register('items', 'bank_card', {
         label = 'Bank Card',
         weight = 0,
         type = 'item',
@@ -23,7 +23,7 @@ end
 
 local function roundAmount(value)
     local amount = tonumber(value)
-    if not QB.util.isFiniteNumber(amount) then return nil end
+    if not Kora.util.isFiniteNumber(amount) then return nil end
     amount = math.floor(amount)
     if amount <= 0 or amount > 1000000000 then return nil end
     return amount
@@ -44,7 +44,7 @@ local function belowMinimum(kind, amount)
 end
 
 local function cleanText(value, fallback, maxLength)
-    return QB.util.cleanText(value, {
+    return Kora.util.cleanText(value, {
         maxLength = maxLength or 50,
         controlCharacters = 'preserve',
     }) or fallback
@@ -130,7 +130,7 @@ end
 
 local function statement(src, accountName, amount, reason, kind, citizenid)
     citizenid = citizenid or (src and src > 0 and exports.kora_core:getPlayerData(src, { 'citizenid' }) or nil)
-    local id = QB.sql.insert(
+    local id = Kora.sql.insert(
         'INSERT INTO bank_statements (citizenid, account_name, amount, reason, statement_type) VALUES (?, ?, ?, ?, ?)',
         { citizenid, accountName, amount, cleanText(reason, kind == 'deposit' and 'Deposit' or 'Withdrawal', 50), kind }
     )
@@ -138,7 +138,7 @@ local function statement(src, accountName, amount, reason, kind, citizenid)
 end
 
 local function refreshAccount(name)
-    local row = QB.sql.single('SELECT * FROM bank_accounts WHERE account_name = ?', { name })
+    local row = Kora.sql.single('SELECT * FROM bank_accounts WHERE account_name = ?', { name })
     Accounts[name] = row
     return row
 end
@@ -151,7 +151,7 @@ local function createAccount(name, balance, kind, citizenid, memberJson)
         memberJson = json.encode(boundedUsers(memberJson))
         if #memberJson > Config.maxSharedMemberBytes then return false end
     end
-    local id = QB.sql.insert(
+    local id = Kora.sql.insert(
         'INSERT INTO bank_accounts (citizenid, account_name, account_balance, account_type, users) VALUES (?, ?, ?, ?, ?)',
         { citizenid, name, balance or 0, kind, memberJson or '[]' }
     )
@@ -177,12 +177,12 @@ local function adjustAccount(name, delta)
     if delta == 0 or not Accounts[name] then return false end
     local changed
     if delta < 0 then
-        changed = QB.sql.update(
+        changed = Kora.sql.update(
             'UPDATE bank_accounts SET account_balance = account_balance + ? WHERE account_name = ? AND account_balance >= ?',
             { delta, name, -delta }
         )
     else
-        changed = QB.sql.update('UPDATE bank_accounts SET account_balance = account_balance + ? WHERE account_name = ?', { delta, name })
+        changed = Kora.sql.update('UPDATE bank_accounts SET account_balance = account_balance + ? WHERE account_name = ?', { delta, name })
     end
     if not changed or changed < 1 then return false end
     refreshAccount(name)
@@ -239,7 +239,7 @@ local function transactionRows(data, accountRowsList)
                     :format(LEG_ID, COLLATION, COLLATION, COLLATION, COLLATION)
                 params[3] = data.citizenid
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
-            rows = QB.sql.query(sql, params) or {}
+            rows = Kora.sql.query(sql, params) or {}
         else
             local sql = 'SELECT ' .. STATEMENT_COLUMNS .. ' FROM bank_statements WHERE account_name = ?'
             local params = { account.name }
@@ -248,7 +248,7 @@ local function transactionRows(data, accountRowsList)
                     :format(LEG_ID, COLLATION, COLLATION, COLLATION, COLLATION)
                 params[2] = account.name
             else sql = sql .. ' ORDER BY id DESC LIMIT 50' end
-            rows = QB.sql.query(sql, params) or {}
+            rows = Kora.sql.query(sql, params) or {}
         end
         -- Whatever the driver returns for the date column (number, string, table), the NUI gets Unix ms or nil.
         for _, row in ipairs(rows) do row.date = BankingDates.normalize(row.date) end
@@ -341,7 +341,7 @@ cardRows = function(src)
 end
 
 dailyWithdrawalRemaining = function(data)
-    local used = QB.sql.scalar(
+    local used = Kora.sql.scalar(
         "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
         { data.citizenid }
     ) or 0
@@ -486,15 +486,15 @@ local function manage(src, data, payload)
         local name = cleanText(payload.name, nil, 40)
         if not name or #name < 3 or not name:match('^[%w][%w _%-]+$') then return nil, 'Enter a valid account name.' end
         if Accounts[name] then return nil, 'That account name is already in use.' end
-        local changed = QB.sql.update('UPDATE bank_accounts SET account_name = ? WHERE account_name = ? AND citizenid = ?', { name, account.account_name, data.citizenid })
+        local changed = Kora.sql.update('UPDATE bank_accounts SET account_name = ? WHERE account_name = ? AND citizenid = ?', { name, account.account_name, data.citizenid })
         if not changed or changed < 1 then return nil, 'The account could not be renamed.' end
-        QB.sql.update('UPDATE bank_statements SET account_name = ? WHERE account_name = ?', { name, account.account_name })
+        Kora.sql.update('UPDATE bank_statements SET account_name = ? WHERE account_name = ?', { name, account.account_name })
         Accounts[account.account_name] = nil
         refreshAccount(name)
         return 'Shared account renamed.'
     elseif payload.kind == 'delete' then
         if tonumber(account.account_balance) ~= 0 then return nil, 'Move the remaining balance before closing this account.' end
-        local changed = QB.sql.update('DELETE FROM bank_accounts WHERE account_name = ? AND citizenid = ?', { account.account_name, data.citizenid })
+        local changed = Kora.sql.update('DELETE FROM bank_accounts WHERE account_name = ? AND citizenid = ?', { account.account_name, data.citizenid })
         if not changed or changed < 1 then return nil, 'The account could not be closed.' end
         Accounts[account.account_name] = nil
         return 'Shared account closed.'
@@ -514,14 +514,14 @@ local function manage(src, data, payload)
             if #list >= Config.maxSharedMembers then
                 return nil, ('Shared accounts support up to %d members.'):format(Config.maxSharedMembers)
             end
-            if not QB.sql.scalar('SELECT citizenid FROM players WHERE citizenid = ? LIMIT 1', { citizenid }) then
+            if not Kora.sql.scalar('SELECT citizenid FROM players WHERE citizenid = ? LIMIT 1', { citizenid }) then
                 return nil, 'No character has that citizen ID.'
             end
             list[#list + 1] = citizenid
         elseif not found then return nil, 'That person does not have access.' end
         local encoded = json.encode(list)
         if #encoded > Config.maxSharedMemberBytes then return nil, 'The account access list is too large.' end
-        local changed = QB.sql.update('UPDATE bank_accounts SET users = ? WHERE account_name = ? AND citizenid = ?', { encoded, account.account_name, data.citizenid })
+        local changed = Kora.sql.update('UPDATE bank_accounts SET users = ? WHERE account_name = ? AND citizenid = ?', { encoded, account.account_name, data.citizenid })
         if not changed or changed < 1 then return nil, 'Account access could not be updated.' end
         account.users = encoded
         return payload.kind == 'addMember' and 'Account access granted.' or 'Account access removed.'
@@ -591,9 +591,9 @@ local function actionCallback(src, payload)
 end
 
 local function registerCallbacks()
-    QB.callback.register('qbbanking:open', openCallback)
-    QB.callback.register('qbbanking:pin', pinCallback)
-    QB.callback.register('qbbanking:action', actionCallback)
+    Kora.callback.register('qbbanking:open', openCallback)
+    Kora.callback.register('qbbanking:pin', pinCallback)
+    Kora.callback.register('qbbanking:action', actionCallback)
 end
 
 registerCallbacks()
@@ -629,7 +629,7 @@ end)
 
 local function bankingExport(name, handler)
     exports(name, handler)
-    QB.compat.provideExport('qb-banking', name, handler)
+    Kora.compat.provideExport('qb-banking', name, handler)
 end
 
 local function createPlayerAccount(playerId, accountName, accountBalance, accountUsers)
@@ -679,18 +679,18 @@ exports.kora_core:addCommand('givecash', 'Give nearby player cash', {
     { name = 'id', help = 'Player ID' }, { name = 'amount', help = 'Amount' },
 }, true, function(src, args)
     local target, amount = tonumber(args[1]), roundAmount(args[2])
-    if not target or not amount then return QB.notify.send(src, { title = 'Banking', message = 'Enter a valid player and amount.', type = 'error' }) end
+    if not target or not amount then return Kora.notify.send(src, { title = 'Banking', message = 'Enter a valid player and amount.', type = 'error' }) end
     local from, to = player(src), exports.kora_core:getPlayerData(target)
-    if not from or not to then return QB.notify.send(src, { title = 'Banking', message = 'Player not found.', type = 'error' }) end
+    if not from or not to then return Kora.notify.send(src, { title = 'Banking', message = 'Player not found.', type = 'error' }) end
     local a, b = GetEntityCoords(GetPlayerPed(src)), GetEntityCoords(GetPlayerPed(target))
-    if #(a - b) > 5.0 then return QB.notify.send(src, { title = 'Banking', message = 'That player is too far away.', type = 'error' }) end
-    if not exports.kora_core:removeMoney(src, 'cash', amount, 'cash transfer', true) then return QB.notify.send(src, { title = 'Banking', message = 'You do not have enough cash.', type = 'error' }) end
+    if #(a - b) > 5.0 then return Kora.notify.send(src, { title = 'Banking', message = 'That player is too far away.', type = 'error' }) end
+    if not exports.kora_core:removeMoney(src, 'cash', amount, 'cash transfer', true) then return Kora.notify.send(src, { title = 'Banking', message = 'You do not have enough cash.', type = 'error' }) end
     if not exports.kora_core:addMoney(target, 'cash', amount, 'cash transfer', true) then
         exports.kora_core:addMoney(src, 'cash', amount, 'cash transfer rollback', true)
-        return QB.notify.send(src, { title = 'Banking', message = 'The transfer failed.', type = 'error' })
+        return Kora.notify.send(src, { title = 'Banking', message = 'The transfer failed.', type = 'error' })
     end
-    QB.notify.send(src, { title = 'Banking', message = ('Gave $%d.'):format(amount), type = 'success' })
-    QB.notify.send(target, { title = 'Banking', message = ('Received $%d.'):format(amount), type = 'success' })
+    Kora.notify.send(src, { title = 'Banking', message = ('Gave $%d.'):format(amount), type = 'success' })
+    Kora.notify.send(target, { title = 'Banking', message = ('Received $%d.'):format(amount), type = 'success' })
 end)
 
 RegisterNetEvent('qbbanking:close', function() Sessions[source] = nil end)
@@ -700,24 +700,24 @@ AddEventHandler('playerDropped', function()
 end)
 
 CreateThread(function()
-    local available, readyErr = QB.sql.ready(60000)
+    local available, readyErr = Kora.sql.ready(60000)
     if not available then
         print(('^1[qbbanking]^7 database unavailable: %s'):format(readyErr or 'unknown error'))
         return
     end
-    local dateColumn = QB.sql.single("SHOW COLUMNS FROM bank_statements WHERE Field = 'date'")
+    local dateColumn = Kora.sql.single("SHOW COLUMNS FROM bank_statements WHERE Field = 'date'")
     if dateColumn and type(dateColumn.Extra) == 'string' and dateColumn.Extra:lower():find('on update', 1, true) then
-        QB.sql.query('ALTER TABLE bank_statements MODIFY date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP')
+        Kora.sql.query('ALTER TABLE bank_statements MODIFY date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP')
     end
-    local rows, loadErr = QB.sql.query('SELECT * FROM bank_accounts')
+    local rows, loadErr = Kora.sql.query('SELECT * FROM bank_accounts')
     if not rows then
         print(('^1[qbbanking]^7 account load failed: %s'):format(loadErr or 'unknown error'))
         return
     end
     for _, account in ipairs(rows) do Accounts[account.account_name] = account end
     local deadline = GetGameTimer() + 5000
-    while QB.shared.epoch('jobs') == 0 and GetGameTimer() < deadline do Wait(25) end
-    local jobs = QB.shared.all('jobs')
+    while Kora.shared.epoch('jobs') == 0 and GetGameTimer() < deadline do Wait(25) end
+    local jobs = Kora.shared.all('jobs')
     for _, definition in ipairs(jobs) do
         local name = definition.name
         if name ~= 'unemployed' and not Accounts[name] then
@@ -727,7 +727,7 @@ CreateThread(function()
             end
         end
     end
-    local gangs = QB.shared.all('gangs')
+    local gangs = Kora.shared.all('gangs')
     for _, definition in ipairs(gangs) do
         local name = definition.name
         if name ~= 'none' and not Accounts[name] then

@@ -35,8 +35,8 @@ Config = {
 }
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
-if QB and QB.config and QB.config.adopt then
-    local config = QB.config
+if Kora and Kora.config and Kora.config.adopt then
+    local config = Kora.config
     Config.atmModels = config.list(Config.atmModels, nil, {
         label = 'ATM models', advanced = true,
         description = 'Model names treated as cash machines by targeting and nearby ATM lookup. Restart qbbanking to apply saved changes.',
