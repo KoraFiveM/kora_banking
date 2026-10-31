@@ -10,6 +10,7 @@ Config = {
     useDailyLimit = true,
     dailyLimit = 5000,
     minAmount = { withdraw = 1, deposit = 1, transfer = 1 },
+    migrationRetrySeconds = 0,
     maxAccounts = 2,
     maxSharedMembers = 10,
     maxSharedMemberBytes = 512,
@@ -90,6 +91,11 @@ if QB and QB.config and QB.config.adopt then
         min = 1,
         label = 'Minimum transfer ($)', advanced = false,
         description = 'Smallest amount a player may transfer (between own accounts and to other players). Enforced by the server and shown in the input. 1 keeps the previous behaviour; set it to 5 for a $5 minimum. Applies immediately.',
+    })
+    Config.migrationRetrySeconds = config.integer(Config.migrationRetrySeconds, {
+        min = 0, max = 3600,
+        label = 'Retry failed database migration (seconds)', advanced = true,
+        description = 'When the durable banking database migration fails at startup, retry it after this many seconds. 0 keeps the previous behaviour: log the failure once and leave durable banking disabled until the resource restarts. Applies the next time a migration fails.',
     })
     Config.maxAccounts = config.integer(Config.maxAccounts, {
         min = 0,

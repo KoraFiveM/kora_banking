@@ -31,6 +31,7 @@ local function boot()
     function core.abortPlayerColumnOperation(_, token) locks[token] = nil; return true end
     local sql = { NULL = '\0qbsql:null\0', ready = function() return true end, migrateFiles = function() return { ran = 1 } end }
     function sql.awaitCheckedOperation() return { active = false } end
+    function sql.scalar() return 0 end
     function sql.awaitCheckedOperations() return { settled = 0 } end
     function sql.single(_, params)
         if f.outage then return nil, 'controlled database outage' end

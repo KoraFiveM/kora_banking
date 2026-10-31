@@ -141,6 +141,7 @@ end
 assert(legSelects == 2, 'both history queries must collate the operation-leg side')
 assert(source:find("STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid", 1, true)
     and source:find('reason %s AS reason, statement_type %s AS statement_type', 1, true), 'statement side must be collated too')
-assert(readFile(root .. 'sql/002_operation_legs_collation.sql'):find('CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', 1, true), 'migration must align bank_operation_legs')
+assert(readFile(root .. 'sql/002_operation_legs_collation.sql'):find('COLLATE=utf8mb4_unicode_ci', 1, true), 'migration must pin bank_operation_legs collation')
+assert(readFile(root .. 'server/finance.lua'):find('CONVERT TO CHARACTER SET utf8mb4 COLLATE %s', 1, true), 'guarded conversion must align existing bank_operation_legs')
 assert(readFile(root .. 'server/finance.lua'):find('002_operation_legs_collation.sql', 1, true), 'migration must be registered')
 print('qbbanking server: statement UNION collation regression passed')
