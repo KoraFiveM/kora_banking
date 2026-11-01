@@ -60,6 +60,15 @@ anything the client sends, and re-checks it on every action. The UI disables gat
 (the same statement table the ATM allowance uses). Feature, limit and default-tier changes apply immediately; map marker
 changes need a resource restart. A per-day transfer total is not tracked.
 
+The counter cap counts withdrawals from every account the character used that day (personal and shared); the day
+resets at midnight on the database clock and is stored in `bank_statements`, so it survives restarts. Overlapping
+requests from one player are processed one at a time so they cannot slip past a cap together.
+
+ATMs are not branches and have no tier: they serve the personal account only (no transfers, shared accounts or member
+management) and keep the `Config.useDailyLimit` / `Config.dailyLimit` allowance. Client-side map markers and the
+"Open <branch>" prompts are rebuilt when the server config arrives, so enabling tiers in `config.local.lua` shows the
+Fleeca / Pacific Standard markers without editing `config.lua`.
+
 The resource name is `kora_banking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
 
 ## Durable resource transactions

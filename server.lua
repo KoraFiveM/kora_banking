@@ -362,10 +362,12 @@ cardRows = function(src)
     return rows
 end
 
+-- cap is a tier counter limit: those count the character's withdrawals from every account (shared ones too),
+-- while the ATM allowance (no cap) only counts the personal account because ATMs only serve that account.
 dailyWithdrawalRemaining = function(data, cap)
     local used = Kora.sql.scalar(
-        "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
-        { data.citizenid }
+        "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND (? = 1 OR account_name = 'checking') AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
+        { data.citizenid, cap and 1 or 0 }
     ) or 0
     return math.max(0, (cap or Config.dailyLimit) - (tonumber(used) or 0))
 end
@@ -617,12 +619,7 @@ local function pinCallback(src, pin)
     return snapshot(src, 'atm', true)
 end
 
-local function actionCallback(src, payload)
-    if type(payload) ~= 'table' then return nil, 'Invalid request.' end
-    local current = activeSession(src)
-    if not current or not current.unlocked then return nil, 'Your banking session expired.' end
-    local data, err = player(src)
-    if not data then return nil, err end
+local function runAction(src, current, data, payload)
     local message, actionErr
     if payload.kind == 'deposit' or payload.kind == 'withdraw' then
         message, actionErr = transactCash(src, data, current, payload)
@@ -636,6 +633,25 @@ local function actionCallback(src, payload)
     end
     if not message then return nil, actionErr end
     return { message = message, snapshot = snapshot(src, current.mode, true, current.branch) }
+end
+
+local function actionCallback(src, payload)
+    if type(payload) ~= 'table' then return nil, 'Invalid request.' end
+    local current = activeSession(src)
+    if not current or not current.unlocked then return nil, 'Your banking session expired.' end
+    local data, err = player(src)
+    if not data then return nil, err end
+    -- Tier limit checks read the database before debiting; serialise a player's actions so two overlapping
+    -- requests cannot both pass the same daily cap.
+    if current.busy then return nil, 'Your previous banking request is still being processed.' end
+    current.busy = true
+    local ok, result, resultErr = pcall(runAction, src, current, data, payload)
+    current.busy = nil
+    if not ok then
+        print(('^1[qbbanking]^7 action failed for %s: %s'):format(src, tostring(result)))
+        return nil, 'The bank encountered an internal error.'
+    end
+    return result, resultErr
 end
 
 local function registerCallbacks()

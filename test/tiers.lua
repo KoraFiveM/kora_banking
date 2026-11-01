@@ -10,6 +10,7 @@ local pos = { x = FLEECA.x, y = FLEECA.y, z = FLEECA.z }
 local player = { citizenid = 'ABC123', money = { cash = 100000, bank = 1000000 }, charinfo = {} }
 local other = { citizenid = 'XYZ789', money = { cash = 0, bank = 0 } }
 local used = 0
+local onScalar
 
 local function presets()
     return {
@@ -43,7 +44,8 @@ local env = setmetatable({
             cleanText = function(s) return s end },
         callback = { register = function(name, fn) callbacks[name] = fn end },
         sql = { ready = function() return true end, query = function() return {} end, single = function() return nil end,
-            insert = function() return 1 end, update = function() return 1 end, scalar = function() return used end },
+            insert = function() return 1 end, update = function() return 1 end,
+            scalar = function(sql, params) if onScalar then onScalar(sql, params) end return used end },
     },
     exports = setmetatable({ kora_core = {
         createUseable = noop, addCommand = noop,
@@ -171,4 +173,23 @@ check(select(2, callbacks['qbbanking:action'](1, { kind = 'deposit', account = '
 at(LEGACY)
 snap = callbacks['qbbanking:open'](1, 'bank', 3)
 check(snap.branch.tier == 'fleeca', 'legacy plain-coordinate branches open on the default tier')
+
+-- The counter cap counts withdrawals from every account (shared ones too); the sql flag is 1 only for tier caps.
+at(FLEECA); reset()
+local capFlags = {}
+onScalar = function(sql, params) capFlags[#capFlags + 1] = params[2] end
+act({ kind = 'withdraw', account = 'checking', amount = 5 })
+check(capFlags[#capFlags] == 1, 'a tier counter cap counts withdrawals from all accounts')
+onScalar = nil
+
+-- Overlapping requests from one player are serialised so two withdrawals cannot both pass the same cap.
+local nested
+callbacks['qbbanking:open'](1, 'bank', 1)
+onScalar = function()
+    onScalar = nil
+    nested = select(2, callbacks['qbbanking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }))
+end
+check(callbacks['qbbanking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }), 'the outer request still completes')
+check(nested == 'Your previous banking request is still being processed.', 'an overlapping request is rejected: ' .. tostring(nested))
+check(act({ kind = 'withdraw', account = 'checking', amount = 5 }), 'the lock is released afterwards')
 print(('qbbanking tiers: %d assertions passed'):format(passed))

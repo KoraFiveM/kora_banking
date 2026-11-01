@@ -4,6 +4,7 @@ os = nil
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
 local notifications = {}
+local removedBlips, configHandlers = {}, {}
 local actionError
 local pinError
 local unlockResult
@@ -72,7 +73,9 @@ _G.Kora = {
             createdBlips[#createdBlips + 1] = { coords = coords, options = options }
             return #createdBlips
         end,
+        remove = function(blip) removedBlips[#removedBlips + 1] = blip return true end,
     },
+    config = { onChange = function(path, handler) configHandlers[path] = handler end },
     notify = { send = function(payload) notifications[#notifications + 1] = payload end },
     progressbar = { start = function() return true end },
     nui = {
@@ -256,6 +259,17 @@ equal(createdBlips[7].options.color, 5, 'Pacific Standard uses its own colour')
 equal(createdBlips[7].options.name, 'Pacific Standard', 'the location label names the marker')
 equal(createdBlips[7].options.category, 'Bank', 'tier markers stay in the Bank category')
 equal(branchOptions[1].label, 'Open Blaine County Savings', 'targets use the location label (the mock keeps the last zone)')
+Config.tiers.enabled = false
+
+-- The server config arrives after this script has run: the change handlers rebuild markers and prompts.
+truthy(configHandlers['tiers.enabled'] and configHandlers['tiers.default'], 'tier settings are watched for config updates')
+for index = #createdBlips, 1, -1 do createdBlips[index] = nil end
+removedBlips = {}
+Config.tiers.enabled = true
+configHandlers['tiers.enabled']()
+equal(#removedBlips, #Config.locations, 'a config update removes the old markers')
+equal(createdBlips[7].options.sprite, 106, 'a config update recreates markers with tier styling')
+equal(branchOptions[1].label, 'Open Blaine County Savings', 'a config update re-registers the branch prompts with branch names')
 Config.tiers.enabled = false
 
 print(('qbbanking client: %d assertions passed'):format(passed))

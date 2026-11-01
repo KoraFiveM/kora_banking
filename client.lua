@@ -628,9 +628,26 @@ local function blipOptions(info)
     return options
 end
 
-for index in ipairs(Config.locations) do
-    local info = BankingTiers.info(index)
-    Kora.blips.create(info.coords, blipOptions(info))
+local branchBlips = {}
+local function createBranchBlips()
+    for _, blip in pairs(branchBlips) do pcall(function() Kora.blips.remove(blip) end) end
+    branchBlips = {}
+    for index in ipairs(Config.locations) do
+        local info = BankingTiers.info(index)
+        branchBlips[index] = Kora.blips.create(info.coords, blipOptions(info))
+    end
+end
+createBranchBlips()
+
+-- This script runs before kora_lib delivers the server config snapshot, so a tier setting enabled in the
+-- server config (config.local.lua or the config editor) only arrives afterwards: rebuild markers and prompts then.
+if Kora.config and Kora.config.onChange then
+    local function refreshBranches()
+        createBranchBlips()
+        registerBranchTargets()
+    end
+    Kora.config.onChange('tiers.enabled', refreshBranches)
+    Kora.config.onChange('tiers.default', refreshBranches)
 end
 
 RegisterNetEvent('qbbanking:client:useCard', accessAtm)
