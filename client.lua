@@ -120,6 +120,14 @@ local function activityRows()
     return rows
 end
 
+local ACTION_FEATURES = {
+    ['banking:withdraw'] = 'withdraw', ['banking:deposit'] = 'deposit',
+    ['banking:transfer:internal'] = 'transfer', ['banking:transfer:player'] = 'transfer',
+    ['banking:order-card'] = 'orderCard', ['banking:create-shared'] = 'sharedAccounts',
+    ['banking:rename-shared'] = 'sharedAccounts', ['banking:delete-shared'] = 'sharedAccounts',
+    ['banking:add-member'] = 'manageMembers', ['banking:remove-member'] = 'manageMembers',
+}
+
 local function appDefinition()
     local snapshot = currentSnapshot or { accounts = {}, profile = {} }
     local accounts = snapshot.accounts or {}
@@ -152,6 +160,8 @@ local function appDefinition()
         }
     end
 
+    local branch = snapshot.mode ~= 'atm' and snapshot.branch or nil
+    local gated = branch and branch.gated or {}
     local accountSelect = accountOptions(accounts)
     local managedAccounts = managedAccountOptions(accounts)
     local managedItems = managedAccountItems(accounts)
@@ -159,6 +169,8 @@ local function appDefinition()
     local minWithdraw = math.max(1, tonumber(minimums.withdraw) or 1)
     local minDeposit = math.max(1, tonumber(minimums.deposit) or 1)
     local minTransfer = math.max(1, tonumber(minimums.transfer) or 1)
+    local maxTransfer = snapshot.limits and tonumber(snapshot.limits.maxTransfer) or nil
+    local transferNote = maxTransfer and (' Maximum transfer at this bank: ' .. money(maxTransfer) .. '.') or ''
     local atmDailyRemaining = snapshot.mode == 'atm' and snapshot.limits and tonumber(snapshot.limits.daily) or nil
     local cardItems = {}
     for _, card in ipairs(snapshot.profile.cards or {}) do
@@ -211,6 +223,14 @@ local function appDefinition()
         },
     }
 
+    local counterDaily = snapshot.mode ~= 'atm' and snapshot.limits and tonumber(snapshot.limits.counterDaily) or nil
+    if counterDaily then
+        local field = cashActions[1].fields[2]
+        field.max = counterDaily >= minWithdraw and counterDaily or nil
+        field.description = (field.description or '') .. (' Daily withdrawal allowance left at this bank: %s.'):format(money(counterDaily))
+        if counterDaily < minWithdraw then cashActions[1].disabled = true end
+    end
+
     local navigation = {
         {
             id = 'accounts', label = 'Accounts', icon = 'wallet', badge = #accounts,
@@ -224,6 +244,7 @@ local function appDefinition()
                             { type = 'stats', items = {
                                 { label = 'Cash on hand', value = money(snapshot.profile.cash), icon = 'dollar-sign' },
                                 { label = 'Selected balance', value = selected and money(selected.balance) or '—', icon = 'dollar-sign', tone = 'primary' },
+                                branch and { label = 'Branch', value = branch.tierLabel or branch.label, icon = 'landmark' } or nil,
                             } },
                             { type = 'list', id = 'bank-accounts', title = 'Accounts', layout = 'cards', searchable = true,
                                 pageSize = 6, items = accountItems, empty = 'No accounts are available.' },
@@ -288,8 +309,8 @@ local function appDefinition()
                         fields = {
                             { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                             { id = 'to', label = 'To', type = 'select', options = accountSelect, required = true },
-                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, required = true,
-                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') },
+                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, max = maxTransfer, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') .. transferNote },
                             { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
                         },
                     },
@@ -306,8 +327,8 @@ local function appDefinition()
                         fields = {
                             { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                             { id = 'recipient', label = 'Recipient account number', type = 'text', required = true, minLength = 1 },
-                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, required = true,
-                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') },
+                            { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, max = maxTransfer, required = true,
+                                placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') .. transferNote },
                             { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },
                         },
                     },
@@ -400,9 +421,36 @@ local function appDefinition()
         }
     end
 
+    -- Tier gating is enforced by the server; this only disables the controls and says where they are available.
+    local notes = {}
+    for _, view in ipairs(navigation) do
+        for _, tab in ipairs(view.tabs or {}) do
+            local content = tab.content or {}
+            local locked = {}
+            local lists = { content.actions or {} }
+            for _, block in ipairs(content.blocks or {}) do
+                if block.type == 'actions' then lists[#lists + 1] = block.actions or {} end
+            end
+            for _, list in ipairs(lists) do
+                for _, action in ipairs(list) do
+                    local where = gated[ACTION_FEATURES[action.id]]
+                    if where then action.disabled = true locked[where] = true end
+                end
+            end
+            for where in pairs(locked) do
+                content.blocks = content.blocks or {}
+                table.insert(content.blocks, 1, { type = 'text', title = 'Not available at this branch', text = ('Available at %s.'):format(where) })
+                tab.content = content
+            end
+        end
+    end
+
+    local branchTitle = branch and (branch.label or branch.tierLabel) or nil
+    local branchDescription = 'Secure account services'
+    if branch and branch.tierLabel and branch.tierLabel ~= branchTitle then branchDescription = branch.tierLabel .. ' · ' .. branchDescription end
     return {
-        id = APP_ID, title = snapshot.mode == 'atm' and 'QBCore ATM' or 'QBCore Bank',
-        description = snapshot.mode == 'atm' and 'Personal banking' or 'Secure account services', icon = 'dollar-sign',
+        id = APP_ID, title = branchTitle or (snapshot.mode == 'atm' and 'QBCore ATM' or 'QBCore Bank'),
+        description = snapshot.mode == 'atm' and 'Personal banking' or branchDescription, icon = 'dollar-sign',
         accent = type(Config.ui.accent) == 'string' and Config.ui.accent or nil,
         layout = snapshot.mode == 'atm' and 'compact' or 'standard',
         width = snapshot.mode == 'atm' and 540 or 1180, height = snapshot.mode == 'atm' and 720 or 760,
@@ -537,13 +585,15 @@ local function registerBranchTargets()
     end
     branchTargetIds = {}
 
-    for index, coords in ipairs(Config.locations) do
+    for index in ipairs(Config.locations) do
         local branchIndex = index
+        local info = BankingTiers.info(index)
         branchTargetIds[index] = exports.kora_target:addSphereZone({
-            coords = coords,
+            coords = info.coords,
             radius = 1.2,
             options = {
-                { icon = 'building-columns', label = 'Open bank', distance = 1.8, onSelect = function() open('bank', branchIndex) end },
+                { icon = 'building-columns', label = info.enabled and info.label and ('Open %s'):format(info.label) or 'Open bank',
+                    distance = 1.8, onSelect = function() open('bank', branchIndex) end },
             },
         })
     end
@@ -566,8 +616,21 @@ AddEventHandler('onClientResourceStart', function(resource)
     registerAtmTargets()
 end)
 
-for _, coords in ipairs(Config.locations) do
-    Kora.blips.create(coords, Config.blipInfo)
+-- With tiers enabled each marker takes its tier's sprite/colour/scale and the location label as its name.
+local function blipOptions(info)
+    if not (info.enabled and info.tier) then return Config.blipInfo end
+    local options = {}
+    for key, value in pairs(Config.blipInfo) do options[key] = value end
+    for _, key in ipairs({ 'sprite', 'color', 'scale' }) do
+        if info.blip and info.blip[key] ~= nil then options[key] = info.blip[key] end
+    end
+    options.name = info.label
+    return options
+end
+
+for index in ipairs(Config.locations) do
+    local info = BankingTiers.info(index)
+    Kora.blips.create(info.coords, blipOptions(info))
 end
 
 RegisterNetEvent('qbbanking:client:useCard', accessAtm)

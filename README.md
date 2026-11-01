@@ -7,6 +7,7 @@
 - Compact ATM interface with server-side PIN checks and attempt throttling
 - Targetable world ATMs with card animation, owner-bound cards, proximity checks, and configurable daily limits
 - Grouped `Bank` map markers created and cleaned up through kora_lib
+- Optional bank tiers: Fleeca Bank branches for everyday cash, Pacific Standard (Big Bank) for shared accounts and larger limits
 - kora_lib callbacks, notifications and interactions
 - kora_core flat exports for players, money, inventory, commands, jobs, and gangs
 - Compatible `AddMoney`, `RemoveMoney`, and account exports for job resources
@@ -20,6 +21,44 @@
 - `kora_inventory`
 
 ATMs are available on the models in `Config.atmModels`. Players can order a bank card and choose its PIN at a branch, then target an ATM or use the card while standing beside one. `Config.atmDistance`, `Config.atmAccessTime`, `Config.useDailyLimit`, and `Config.dailyLimit` control the ATM flow.
+
+## Bank tiers (Fleeca Bank vs Pacific Standard)
+
+Off by default: with `Config.tiers.enabled = false` every branch behaves exactly as before. Set it to `true` to give
+branches different services.
+
+`Config.locations` entries are either plain coordinates (still valid; they use `Config.tiers.default`) or a table:
+
+```lua
+locations = {
+    vector3(149.05, -1041.3, 29.37),                                                  -- legacy: default tier
+    { coords = vector3(247.65, 223.87, 106.29), tier = 'bigbank', label = 'Pacific Standard' },
+}
+```
+
+`label` names the branch in the app header, the target prompt and the map marker; without it the tier label is used.
+The shipped locations are tagged: Pacific Standard (Vinewood/Alta) is `bigbank`, the six Fleeca branches are `fleeca`, and
+Blaine County Savings (Paleto) is `fleeca` with its own label.
+
+`Config.tiers.list.<tier>` defines each tier:
+
+| Option | Meaning |
+| --- | --- |
+| `label` | Name shown in the header, in "Available at ..." messages and on the map |
+| `features.<name>` | `false` blocks the feature at that tier (unset = allowed). Names: `deposit`, `withdraw`, `transfer`, `sharedAccounts` (open/rename/close shared accounts), `manageMembers` (grant/revoke access), `orderCard` |
+| `limits.dailyWithdraw` | Daily withdrawal cap at bank counters of the tier ($, `0` = no limit). ATMs keep `Config.dailyLimit` |
+| `limits.maxTransfer` | Largest single transfer at the tier ($, `0` = no limit) |
+| `blip` | Optional `sprite`, `color`, `scale` overrides for that tier's map markers |
+
+Default preset: Fleeca = cash, deposits, withdrawals and transfers up to `$10,000` with a `$5,000` daily withdrawal cap;
+Pacific Standard = everything Fleeca offers plus shared accounts and member management, transfers up to `$250,000`
+and a `$50,000` daily withdrawal cap. You can add your own tiers under `list` and point locations at them.
+
+The server picks the tier from the nearest configured location to the player's real position (within 3 m), never from
+anything the client sends, and re-checks it on every action. The UI disables gated actions and says
+"Available at Pacific Standard". The daily withdrawal cap counts all of the character's bank-account withdrawals of the day
+(the same statement table the ATM allowance uses). Feature, limit and default-tier changes apply immediately; map marker
+changes need a resource restart. A per-day transfer total is not tracked.
 
 The resource name is `kora_banking`. It provides the legacy `qb-banking` identity and card-use event so existing job resources can migrate without breaking.
 

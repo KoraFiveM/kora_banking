@@ -6,7 +6,7 @@ local vec = {}
 vec.__index = vec
 vec.__sub = function(a, b) return setmetatable({ d = math.abs((a.x or 0) - (b.x or 0)) }, vec) end
 vec.__len = function(a) return a.d or 0 end
-local here = setmetatable({ x = 0 }, vec)
+local here = setmetatable({ x = 0, y = 0, z = 0 }, vec)
 local player = { citizenid = 'ABC123', money = { cash = 100, bank = 1000 }, charinfo = {} }
 local other = { citizenid = 'XYZ789', money = { cash = 0, bank = 0 } }
 local function purse(src) return src == 1 and player or other end
@@ -44,6 +44,7 @@ local env = setmetatable({
 for _, fn in pairs(env.exports.kora_core) do assert(type(fn) == 'function') end
 env.Kora.compat = { provideExport = noop }
 assert(loadfile(root .. 'server.lua', 't', env))()
+assert(loadfile(root .. 'tiers.lua', 't', env))()
 for _, thread in ipairs(threads) do thread() end
 
 local function act(payload)

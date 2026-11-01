@@ -40,6 +40,7 @@ local env = setmetatable({
     GetGameTimer = function() return 0 end,
     CreateThread = function(fn) threads[#threads + 1] = fn end,
 }, { __index = _G })
+assert(loadfile(root .. 'tiers.lua', 't', env))()
 env.Kora.compat = assert(loadfile(root .. '../kora_lib/compat/provider.lua', 't', env))()()
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[1]()

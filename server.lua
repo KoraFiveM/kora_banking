@@ -260,7 +260,7 @@ end
 local cardRows
 local dailyWithdrawalRemaining
 
-local function snapshot(src, mode, unlocked)
+local function snapshot(src, mode, unlocked, branch)
     local data, err = player(src)
     if not data then return nil, err end
     if mode == 'bank' then ensureOrganizationAccounts(data) end
@@ -277,18 +277,36 @@ local function snapshot(src, mode, unlocked)
         },
         accounts = unlocked == false and {} or list,
         transactions = unlocked == false and {} or transactionRows(data, list),
+        branch = mode == 'bank' and branch and branch.enabled and branch.tier and {
+            label = branch.label, tier = branch.tier, tierLabel = branch.tierLabel, gated = BankingTiers.gated(branch),
+        } or nil,
         dates = { format = Config.dateFormat, showTime = Config.showTime, timeZone = BankingDates.timeZoneMode(Config.dateTimezone) },
         limits = { daily = Config.useDailyLimit and dailyWithdrawalRemaining(data) or nil, maxAccounts = Config.maxAccounts,
-            min = { withdraw = minimumAmount('withdraw'), deposit = minimumAmount('deposit'), transfer = minimumAmount('transfer') } },
+            min = { withdraw = minimumAmount('withdraw'), deposit = minimumAmount('deposit'), transfer = minimumAmount('transfer') },
+            maxTransfer = BankingTiers.limit(branch, 'maxTransfer'),
+            counterDaily = BankingTiers.limit(branch, 'dailyWithdraw') and dailyWithdrawalRemaining(data, BankingTiers.limit(branch, 'dailyWithdraw')) or nil },
     }
 end
 
-local function nearBranch(src, index)
-    local location = Config.locations[tonumber(index)]
-    if not location then return false end
+local BRANCH_RANGE = 3.0
+
+-- The branch (with its tier) the player is physically standing at: the nearest configured location in range.
+-- The client-sent index only has to name a real location; the tier never comes from the client.
+local function branchAt(src, index)
+    if not BankingTiers.entry(Config.locations[tonumber(index)]) then return nil end
     local ped = GetPlayerPed(src)
-    if ped == 0 then return false end
-    return #(GetEntityCoords(ped) - location) <= 3.0
+    if ped == 0 then return nil end
+    return BankingTiers.resolve(GetEntityCoords(ped), BRANCH_RANGE)
+end
+
+local function nearBranch(src, index)
+    return branchAt(src, index) ~= nil
+end
+
+-- Returns an error message when the branch's tier blocks the feature (always nil while tiers are disabled).
+local function tierBlocks(branch, feature, what)
+    if BankingTiers.can(branch, feature) then return nil end
+    return ('%s is only available at %s.'):format(what, BankingTiers.availableAt(feature) or 'another branch')
 end
 
 local function nearAtm(src, location)
@@ -308,7 +326,10 @@ end
 local function activeSession(src)
     local current = Sessions[src]
     if not current or current.expires < os.time() then Sessions[src] = nil return nil end
-    if current.mode == 'bank' and not nearBranch(src, current.location) then Sessions[src] = nil return nil end
+    if current.mode == 'bank' then
+        current.branch = branchAt(src, current.location)
+        if not current.branch then Sessions[src] = nil return nil end
+    end
     if current.mode == 'atm' and not nearAtm(src, current.location) then Sessions[src] = nil return nil end
     current.expires = os.time() + 300
     return current
@@ -341,12 +362,12 @@ cardRows = function(src)
     return rows
 end
 
-dailyWithdrawalRemaining = function(data)
+dailyWithdrawalRemaining = function(data, cap)
     local used = Kora.sql.scalar(
         "SELECT COALESCE(SUM(amount), 0) FROM bank_statements WHERE citizenid = ? AND account_name = 'checking' AND statement_type = 'withdraw' AND date >= CURRENT_DATE()",
         { data.citizenid }
     ) or 0
-    return math.max(0, Config.dailyLimit - (tonumber(used) or 0))
+    return math.max(0, (cap or Config.dailyLimit) - (tonumber(used) or 0))
 end
 
 local function sourceAccount(data, name)
@@ -378,6 +399,9 @@ local function transactCash(src, data, current, payload)
     local reason = cleanText(payload.reason, payload.kind == 'deposit' and 'Cash deposit' or 'Cash withdrawal', 50)
     local tooSmall = belowMinimum(payload.kind == 'deposit' and 'deposit' or 'withdraw', amount)
     if tooSmall then return nil, tooSmall end
+    local blocked = payload.kind == 'deposit' and tierBlocks(current.branch, 'deposit', 'Depositing cash')
+        or payload.kind ~= 'deposit' and tierBlocks(current.branch, 'withdraw', 'Withdrawing cash') or nil
+    if blocked then return nil, blocked end
 
     if payload.kind == 'deposit' then
         if (tonumber(data.money.cash) or 0) < amount then return nil, 'You do not have that much cash.' end
@@ -395,6 +419,10 @@ local function transactCash(src, data, current, payload)
             return nil, 'Above the limit of what you may withdraw at this ATM.'
         end
     end
+    local counterCap = current.mode == 'bank' and BankingTiers.limit(current.branch, 'dailyWithdraw') or nil
+    if counterCap and amount > dailyWithdrawalRemaining(data, counterCap) then
+        return nil, ('Above the daily withdrawal limit of $%d at %s.'):format(counterCap, current.branch.label or 'this bank')
+    end
     if not debit(src, data, account, amount, reason) then return nil, 'That account does not have enough money.' end
     if not exports.kora_core:addMoney(src, 'cash', amount, reason, true) then
         credit(src, account, amount, 'bank withdrawal rollback')
@@ -404,7 +432,7 @@ local function transactCash(src, data, current, payload)
     return ('Withdrew $%s.'):format(amount)
 end
 
-local function transfer(src, data, payload)
+local function transfer(src, data, payload, branch)
     local amount = roundAmount(payload.amount)
     if not amount then return nil, 'Enter a valid amount.' end
     local from = sourceAccount(data, payload.from)
@@ -412,6 +440,13 @@ local function transfer(src, data, payload)
     local reason = cleanText(payload.reason, 'Bank transfer', 50)
     local tooSmall = belowMinimum('transfer', amount)
     if tooSmall then return nil, tooSmall end
+    local blocked = tierBlocks(branch, 'transfer', 'Transferring money')
+    if blocked then return nil, blocked end
+    local maxTransfer = BankingTiers.limit(branch, 'maxTransfer')
+    if maxTransfer and amount > maxTransfer then
+        local higher = BankingTiers.higherLimitAt('maxTransfer', maxTransfer)
+        return nil, ('Transfers above $%d%s.'):format(maxTransfer, higher and (' are only available at ' .. higher) or ' are not allowed here')
+    end
 
     if payload.to then
         local destination = sourceAccount(data, payload.to)
@@ -442,7 +477,19 @@ local function transfer(src, data, payload)
     return ('Sent $%s.'):format(amount)
 end
 
-local function manage(src, data, payload)
+local MANAGE_FEATURES = {
+    orderCard = { 'orderCard', 'Ordering a bank card' },
+    create = { 'sharedAccounts', 'Opening a shared account' },
+    rename = { 'sharedAccounts', 'Renaming a shared account' },
+    delete = { 'sharedAccounts', 'Closing a shared account' },
+    addMember = { 'manageMembers', 'Managing account members' },
+    removeMember = { 'manageMembers', 'Managing account members' },
+}
+
+local function manage(src, data, payload, branch)
+    local gate = MANAGE_FEATURES[payload.kind]
+    local blocked = gate and tierBlocks(branch, gate[1], gate[2])
+    if blocked then return nil, blocked end
     if payload.kind == 'orderCard' then
         local pin = tostring(payload.pin or '')
         if not pin:match('^%d%d%d%d$') then return nil, 'Choose a 4-digit PIN.' end
@@ -541,7 +588,7 @@ local function openBanking(src, mode, location)
     end
     if not nearBranch(src, location) then return nil, 'Move closer to a bank counter.' end
     session(src, mode, true, location)
-    return snapshot(src, mode, true)
+    return snapshot(src, mode, true, branchAt(src, location))
 end
 
 local function openCallback(src, mode, location)
@@ -581,14 +628,14 @@ local function actionCallback(src, payload)
         message, actionErr = transactCash(src, data, current, payload)
     elseif payload.kind == 'transfer' then
         if current.mode == 'atm' then return nil, 'Transfers are available inside a bank.' end
-        message, actionErr = transfer(src, data, payload)
+        message, actionErr = transfer(src, data, payload, current.branch)
     elseif current.mode == 'bank' then
-        message, actionErr = manage(src, data, payload)
+        message, actionErr = manage(src, data, payload, current.branch)
     else
         return nil, 'That action is not available at an ATM.'
     end
     if not message then return nil, actionErr end
-    return { message = message, snapshot = snapshot(src, current.mode, true) }
+    return { message = message, snapshot = snapshot(src, current.mode, true, current.branch) }
 end
 
 local function registerCallbacks()

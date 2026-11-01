@@ -22,16 +22,43 @@ Config = {
         scale = 0.55,
         shortRange = true,
     },
+    -- Each location is either plain coordinates (legacy; uses Config.tiers.default when tiers are enabled) or
+    -- { coords = vector3/vector4, tier = 'fleeca' | 'bigbank' | <your tier>, label = 'Shown in the app header and on the map' }.
     locations = {
-        vector3(149.05, -1041.3, 29.37),
-        vector3(313.32, -280.03, 54.17),
-        vector3(-351.94, -50.72, 49.04),
-        vector3(-1212.68, -331.83, 37.78),
-        vector3(-2961.67, 482.31, 15.7),
-        vector3(1175.64, 2707.71, 38.09),
-        vector3(247.65, 223.87, 106.29),
-        vector3(-111.98, 6470.56, 31.63)
-    }
+        { coords = vector3(149.05, -1041.3, 29.37), tier = 'fleeca', label = 'Fleeca Bank - Legion Square' },
+        { coords = vector3(313.32, -280.03, 54.17), tier = 'fleeca', label = 'Fleeca Bank - Hawick Avenue' },
+        { coords = vector3(-351.94, -50.72, 49.04), tier = 'fleeca', label = 'Fleeca Bank - Burton' },
+        { coords = vector3(-1212.68, -331.83, 37.78), tier = 'fleeca', label = 'Fleeca Bank - Rockford Plaza' },
+        { coords = vector3(-2961.67, 482.31, 15.7), tier = 'fleeca', label = 'Fleeca Bank - Great Ocean Highway' },
+        { coords = vector3(1175.64, 2707.71, 38.09), tier = 'fleeca', label = 'Fleeca Bank - Harmony' },
+        { coords = vector3(247.65, 223.87, 106.29), tier = 'bigbank', label = 'Pacific Standard' },
+        -- Blaine County Savings is a small regional branch, so it ships as a Fleeca-tier location with its own name.
+        { coords = vector3(-111.98, 6470.56, 31.63), tier = 'fleeca', label = 'Blaine County Savings' },
+    },
+    -- Bank tiers (off by default: with enabled = false every branch behaves exactly as before).
+    -- When enabled, the server resolves the tier from the branch the player is standing at (never from the client).
+    -- features: set a feature to false to block it at that tier (unset = allowed). Gated features: deposit, withdraw,
+    -- transfer, sharedAccounts (open/rename/close shared accounts), manageMembers (grant/revoke access), orderCard.
+    -- limits (0 = no limit): dailyWithdraw = per-day counter withdrawal cap, maxTransfer = largest single transfer.
+    -- blip: optional per-tier map marker overrides (sprite, color, scale); the location label names the marker.
+    tiers = {
+        enabled = false,
+        default = 'fleeca',
+        list = {
+            fleeca = {
+                label = 'Fleeca Bank',
+                features = { deposit = true, withdraw = true, transfer = true, sharedAccounts = false, manageMembers = false, orderCard = true },
+                limits = { dailyWithdraw = 5000, maxTransfer = 10000 },
+                blip = { sprite = 108, color = 2 },
+            },
+            bigbank = {
+                label = 'Pacific Standard',
+                features = { deposit = true, withdraw = true, transfer = true, sharedAccounts = true, manageMembers = true, orderCard = true },
+                limits = { dailyWithdraw = 50000, maxTransfer = 250000 },
+                blip = { sprite = 106, color = 5 },
+            },
+        },
+    },
 }
 
 -- Registers this resource-owned configuration with kora_lib without changing its public Config table.
@@ -145,9 +172,47 @@ if Kora and Kora.config and Kora.config.adopt then
         label = 'Show bank markers only nearby', advanced = false,
         description = 'Makes bank markers short-range on the minimap; their pause-map category remains available. Restart qbbanking to apply saved changes.',
     })
+    Config.tiers.enabled = config.boolean(Config.tiers.enabled, {
+        label = 'Enable bank tiers (Fleeca / Pacific Standard)', advanced = false,
+        description = 'When on, each bank location uses the features, limits and map marker of its tier (Fleeca Bank or Pacific Standard by default). Shared accounts and member management are Pacific Standard only in the default preset. Off keeps every branch identical. Applies immediately for server checks; restart kora_banking to refresh map markers.',
+    })
+    local tierNames = {}
+    for name in pairs(Config.tiers.list) do tierNames[#tierNames + 1] = name end
+    table.sort(tierNames)
+    local tierOptions = {}
+    for _, name in ipairs(tierNames) do tierOptions[#tierOptions + 1] = { value = name, label = Config.tiers.list[name].label or name } end
+    Config.tiers.default = config.enum(Config.tiers.default, {
+        options = tierOptions,
+        label = 'Default bank tier', advanced = false,
+        description = 'Tier used by locations that are plain coordinates or name an unknown tier. Applies immediately.',
+    })
+    for _, name in ipairs(tierNames) do
+        local tier = Config.tiers.list[name]
+        tier.label = config.string(tier.label, {
+            minLength = 1,
+            label = name .. ' tier name', advanced = false,
+            description = 'Name shown in the app header, in "Available at ..." messages and on the map for this tier. Applies the next time the bank opens.',
+        })
+        for feature, allowed in pairs(tier.features) do
+            tier.features[feature] = config.boolean(allowed, {
+                label = name .. ' tier: ' .. feature, advanced = false,
+                description = 'Allows ' .. feature .. ' at locations of this tier. Off blocks it on the server and disables it in the app. Applies immediately.',
+            })
+        end
+        tier.limits.dailyWithdraw = config.integer(tier.limits.dailyWithdraw, {
+            min = 0,
+            label = name .. ' tier daily withdrawal limit ($)', advanced = false,
+            description = 'Most a character may withdraw per day (since midnight, database clock) at bank counters of this tier. 0 means no limit. ATMs keep using the daily ATM allowance. Applies immediately.',
+        })
+        tier.limits.maxTransfer = config.integer(tier.limits.maxTransfer, {
+            min = 0,
+            label = name .. ' tier largest single transfer ($)', advanced = false,
+            description = 'Largest amount one transfer may move at locations of this tier; larger transfers must be made at a tier with a higher limit. 0 means no limit. Applies immediately.',
+        })
+    end
     Config.locations = config.list(Config.locations, nil, {
         label = 'Bank locations', advanced = true,
-        description = 'World X/Y/Z coordinates in metres for bank interactions, server proximity checks, and map markers. Restart qbbanking to apply saved changes.',
+        description = 'Bank locations used for interactions, server proximity checks, and map markers. Each entry is plain X/Y/Z coordinates or a table with coords, tier and label. Restart qbbanking to apply saved changes.',
     })
     Config = config.adopt(Config)
 end

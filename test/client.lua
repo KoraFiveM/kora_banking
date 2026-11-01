@@ -89,6 +89,7 @@ _G.Kora = {
 
 dofile(root .. 'config.lua')
 dofile(root .. 'dates.lua')
+dofile(root .. 'tiers.lua')
 dofile(root .. 'client.lua')
 
 local passed = 0
@@ -214,5 +215,47 @@ atmOptions[1].onSelect()
 local emptyWithdraw = tab(view({ navigation = unlockResult.update.navigation }, 'cash'), 'withdraw').content.actions[1]
 truthy(emptyWithdraw.disabled, 'ATM withdrawal is disabled at a zero balance')
 equal(emptyWithdraw.fields[2].max, nil, 'zero balance never produces invalid min/max bounds')
+
+-- Tiers off (default): header and markers are unchanged. Tiers on: label in the header, gated actions disabled with a clear message.
+equal(defaultBank.title, 'QBCore Bank', 'the header is unchanged while tiers are disabled')
+bankSnapshot.profile.cash = 700
+bankSnapshot.branch = {
+    label = 'Fleeca Bank - Test', tier = 'fleeca', tierLabel = 'Fleeca Bank',
+    gated = { sharedAccounts = 'Pacific Standard', manageMembers = 'Pacific Standard' },
+}
+bankSnapshot.limits = { min = { withdraw = 1, deposit = 1, transfer = 1 }, maxTransfer = 10000, counterDaily = 5000 }
+branchOptions[1].onSelect()
+local tiered = apps[#apps]
+equal(tiered.title, 'Fleeca Bank - Test', 'the header shows the branch label')
+truthy(tiered.description:find('Fleeca Bank', 1, true), 'the header description shows the tier')
+local tieredManage = view(tiered, 'manage')
+local sharedTab = tab(tieredManage, 'shared').content
+truthy(sharedTab.actions[1].disabled, 'creating a shared account is disabled at a Fleeca branch')
+equal(sharedTab.blocks[1].text, 'Available at Pacific Standard.', 'the disabled action says where it is available')
+truthy(not tab(tieredManage, 'card').content.actions[1].disabled, 'bank cards stay available at a Fleeca branch')
+local accessBlock = tab(tieredManage, 'access').content.blocks
+equal(accessBlock[1].text, 'Available at Pacific Standard.', 'member management shows the gate note')
+for _, action in ipairs(accessBlock[2].actions) do truthy(action.disabled, action.id .. ' is disabled at a Fleeca branch') end
+truthy(not tab(view(tiered, 'cash'), 'deposit').content.actions[1].disabled, 'deposits stay enabled at a Fleeca branch')
+local tieredWithdraw = tab(view(tiered, 'cash'), 'withdraw').content.actions[1]
+equal(tieredWithdraw.fields[2].max, 5000, 'the counter daily allowance caps the withdrawal input')
+equal(tab(view(tiered, 'transfer'), 'player').content.actions[1].fields[3].max, 10000, 'the transfer input shows the tier maximum')
+equal(view(tiered, 'accounts').tabs[1].content.blocks[1].items[3].value, 'Fleeca Bank', 'the summary shows the branch tier')
+bankSnapshot.branch.gated = {}
+branchOptions[1].onSelect()
+local bigTier = apps[#apps]
+truthy(not tab(view(bigTier, 'manage'), 'shared').content.actions[1].disabled, 'nothing is disabled when the tier gates nothing')
+bankSnapshot.branch, bankSnapshot.limits = nil, nil
+
+Config.tiers.enabled = true
+for index = #createdBlips, 1, -1 do createdBlips[index] = nil end
+dofile(root .. 'client.lua')
+equal(createdBlips[1].options.sprite, Config.tiers.list.fleeca.blip.sprite, 'fleeca markers use the fleeca sprite')
+equal(createdBlips[7].options.sprite, 106, 'Pacific Standard uses its own sprite')
+equal(createdBlips[7].options.color, 5, 'Pacific Standard uses its own colour')
+equal(createdBlips[7].options.name, 'Pacific Standard', 'the location label names the marker')
+equal(createdBlips[7].options.category, 'Bank', 'tier markers stay in the Bank category')
+equal(branchOptions[1].label, 'Open Blaine County Savings', 'targets use the location label (the mock keeps the last zone)')
+Config.tiers.enabled = false
 
 print(('qbbanking client: %d assertions passed'):format(passed))
