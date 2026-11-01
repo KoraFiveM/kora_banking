@@ -102,19 +102,22 @@ end
 local function activityRows()
     local transactions = currentSnapshot and currentSnapshot.transactions and currentSnapshot.transactions[selectedAccount] or {}
     local rows = {}
+    local offset = BankingDates.timeZoneMode(Config.dateTimezone) == 'server' and 0 or BankingDates.localOffset()
     for _, transaction in ipairs(transactions) do
         local deposit = transaction.statement_type == 'deposit'
         rows[#rows + 1] = {
             id = transaction.id,
             type = { label = deposit and 'Deposit' or 'Withdrawal', badge = true, tone = deposit and 'success' or 'neutral' },
             amount = { label = (deposit and '+' or '-') .. money(transaction.amount), tone = deposit and 'success' or 'neutral' },
-            dateMs = BankingDates.normalize(transaction.date),
             reason = transaction.reason or (deposit and 'Deposit' or 'Withdrawal'),
-            date = BankingDates.safeFormat(transaction.date, {
-                format = Config.dateFormat, showTime = Config.showTime,
-                offset = BankingDates.timeZoneMode(Config.dateTimezone) == 'server' and 0 or BankingDates.localOffset(),
-                locale = GetConvar and GetConvar('locale', 'en-US') or 'en-US',
-            }),
+            -- value is the UTC epoch (ms) so the column sorts chronologically; label is shown in the player's zone.
+            date = {
+                value = BankingDates.normalize(transaction.date),
+                label = BankingDates.safeFormat(transaction.date, {
+                    format = Config.dateFormat, showTime = Config.showTime, offset = offset,
+                    locale = GetConvar and GetConvar('locale', 'en-US') or 'en-US',
+                }),
+            },
         }
     end
     return rows

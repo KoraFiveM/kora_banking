@@ -138,10 +138,11 @@ equal(branchWithdraw.fields[2].description, 'Each account option shows its curre
     'branch withdrawal feedback remains accurate when the form account changes')
 local activity = tab(view(bank, 'accounts'), 'activity').content.blocks[1]
 truthy(activity.searchable and activity.pageSize == 10, 'activity is searchable and paged')
-truthy(activity.rows[1].date:match('^%d%d/%d%d/%d%d%d%d'), 'activity dates render as formatted dates, not table addresses')
+truthy(activity.rows[1].date.label:match('^%d%d/%d%d/%d%d%d%d'), 'activity dates render as formatted dates, not table addresses')
 Config.dateFormat = 'YYYY-MM-DD'
 Config.showTime = false
 equal(BankingDates.format(1793326800000, { format = Config.dateFormat, showTime = Config.showTime, utc = true }), '2026-10-30', 'Config options drive the formatter')
+equal(activity.rows[1].date.value, 1793326800000, 'activity date keeps the UTC epoch as the sortable value')
 truthy(activity.rows[1].type.badge, 'transaction status uses a rich badge cell')
 local manageView = view(bank, 'manage')
 local sharedBlocks = tab(manageView, 'shared').content.blocks

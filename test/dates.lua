@@ -65,3 +65,14 @@ local source = assert(io.open(root .. 'server.lua')):read('a')
 local _, halves = source:gsub('CAST%(UNIX_TIMESTAMP%(', '')
 equal(halves, 3, 'statement and both operation-leg queries normalise the date in SQL')
 print('dates ok')
+
+-- FiveM natives live behind the _G metatable, not as raw globals (rawget would miss them)
+_G.GetLocalTime, _G.GetUtcTime, _G.GetCloudTimeAsInt = nil, nil, nil
+equal(D.localOffset(), 0, 'localOffset is 0 again once the natives are gone')
+setmetatable(_G, { __index = function(_, name)
+    if name == 'GetLocalTime' then return function() return 2026, 10, 30, 13, 26, 0 end end
+    if name == 'GetUtcTime' then return function() return 2026, 10, 30, 17, 26, 0 end end
+end })
+equal(D.localOffset(), -4 * 3600, 'localOffset finds natives resolved through the _G metatable (US Eastern)')
+equal(D.format(1793381160000, { format = 'locale', locale = 'en-US', offset = D.localOffset() }), '10/30/2026 1:26 PM', 'withdraw at 17:26 UTC shows 1:26 PM for US Eastern')
+setmetatable(_G, nil)
