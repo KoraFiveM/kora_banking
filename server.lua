@@ -434,6 +434,64 @@ local function transactCash(src, data, current, payload)
     return ('Withdrew $%s.'):format(amount)
 end
 
+local function transferSettings()
+    local value = type(Config.Transfers) == 'table' and Config.Transfers or {}
+    return { allowOffline = value.allowOffline ~= false, allowSharedAccounts = value.allowSharedAccounts ~= false, allowCardNumbers = value.allowCardNumbers ~= false }
+end
+
+-- Issued bank cards store their number in the item info (info.cardNumber, info.citizenid = issuing character).
+local function findCardIssuer(node, number, depth)
+    if type(node) ~= 'table' or depth > 6 then return nil end
+    if tostring(node.cardNumber or '') == number and type(node.citizenid) == 'string' then return node.citizenid end
+    for _, child in pairs(node) do
+        local found = findCardIssuer(child, number, depth + 1)
+        if found then return found end
+    end
+end
+
+-- Resolves what the sender typed to a character (online or offline) or a shared / society / gang account:
+-- citizen ID first, then account name, then bank card number.
+local function resolveRecipient(ref, settings)
+    local online = exports.kora_core:getPlayerByCitizenId(ref)
+    if online and online.source then return { kind = 'player', citizenid = ref, source = online.source } end
+    if settings.allowSharedAccounts then
+        local account = Accounts[ref]
+        if not account then
+            local row = Kora.sql.single('SELECT account_name FROM bank_accounts WHERE account_name = ?', { ref })
+            account = row and refreshAccount(row.account_name)
+        end
+        if account then return { kind = 'account', account = account } end
+    end
+    local function character(citizenid)
+        local live = exports.kora_core:getPlayerByCitizenId(citizenid)
+        if live and live.source then return { kind = 'player', citizenid = citizenid, source = live.source } end
+        if Kora.sql.single('SELECT citizenid FROM players WHERE citizenid = ? AND deleted_at IS NULL', { citizenid }) then
+            return { kind = 'player', citizenid = citizenid }
+        end
+    end
+    local found = character(ref)
+    if found then return found end
+    if settings.allowCardNumbers and ref:match('^%d+$') and #ref >= 12 and #ref <= 19 then
+        local rows = Kora.sql.query('SELECT citizenid, inventory FROM players WHERE deleted_at IS NULL AND inventory LIKE ?', { '%"cardNumber":"' .. ref .. '"%' }) or {}
+        for _, row in ipairs(rows) do
+            local ok, inventory = pcall(json.decode, row.inventory or '')
+            local issuer = ok and findCardIssuer(inventory, ref, 0) or nil
+            found = issuer and character(issuer) or nil
+            if found then return found end
+        end
+    end
+end
+
+-- Offline recipients are credited in the database with the same guarded JSON update the durable ledger uses.
+local function creditOffline(citizenid, amount)
+    local changed = Kora.sql.update(
+        [[UPDATE players SET money = JSON_SET(money, '$.bank', COALESCE(JSON_EXTRACT(money, '$.bank'), 0) + ?)
+          WHERE citizenid = ? AND deleted_at IS NULL AND COALESCE(JSON_EXTRACT(money, '$.bank'), 0) + ? <= 9007199254740991]],
+        { amount, citizenid, amount }
+    )
+    return changed ~= nil and changed ~= false and changed >= 1
+end
+
 local function transfer(src, data, payload, branch)
     local amount = roundAmount(payload.amount)
     if not amount then return nil, 'Enter a valid amount.' end
@@ -464,18 +522,44 @@ local function transfer(src, data, payload, branch)
         return ('Transferred $%s.'):format(amount)
     end
 
-    local citizenid = cleanText(payload.recipient, nil, 16)
-    if not citizenid then return nil, 'Enter an account number.' end
-    local recipient = exports.kora_core:getPlayerByCitizenId(citizenid)
-    if not recipient or not recipient.source then return nil, 'That account holder must be online.' end
+    local ref = cleanText(payload.recipient, nil, 50)
+    if not ref then return nil, 'Enter an account number.' end
+    ref = ref:gsub('^%s+', ''):gsub('%s+$', ''):gsub('^(%d%d%d%d)[ %-](%d%d%d%d)[ %-](%d%d%d%d)[ %-](%d%d%d%d)$', '%1%2%3%4')
+    local settings = transferSettings()
+    local target = resolveRecipient(ref, settings)
+    if not target then
+        return nil, settings.allowOffline and 'No account was found with that number.' or 'That account holder must be online.'
+    end
+
+    if target.kind == 'account' then
+        local name = target.account.account_name
+        if name == from.account_name then return nil, 'Choose two different accounts.' end
+        if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
+        if not credit(src, target.account, amount, reason) then
+            credit(src, from, amount, 'transfer rollback')
+            return nil, 'The recipient could not be credited.'
+        end
+        statement(src, from.account_name, amount, reason, 'withdraw')
+        statement(src, name, amount, reason, 'deposit')
+        return ('Sent $%s.'):format(amount)
+    end
+
+    local citizenid = target.citizenid
     if citizenid == data.citizenid then return nil, 'Use an internal transfer for your own accounts.' end
+    -- The holder may have logged in since the lookup; re-check so an online player is credited through their player object.
+    local online = target.source and target or exports.kora_core:getPlayerByCitizenId(citizenid)
+    local recipientSource = online and online.source or nil
+    if not recipientSource and not settings.allowOffline then return nil, 'That account holder must be online.' end
     if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
-    if not exports.kora_core:addMoney(recipient.source, 'bank', amount, reason, true) then
+    local credited
+    if recipientSource then credited = exports.kora_core:addMoney(recipientSource, 'bank', amount, reason, true)
+    else credited = creditOffline(citizenid, amount) end
+    if not credited then
         credit(src, from, amount, 'transfer rollback')
         return nil, 'The recipient could not be credited.'
     end
     statement(src, from.account_name, amount, reason, 'withdraw')
-    statement(recipient.source, 'checking', amount, reason, 'deposit', citizenid)
+    statement(recipientSource, 'checking', amount, reason, 'deposit', citizenid)
     return ('Sent $%s.'):format(amount)
 end
 

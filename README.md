@@ -139,3 +139,19 @@ coordination and are outside this guarantee.
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
+
+## Player transfers
+
+The "Another player" transfer accepts a character account number (citizen ID), a shared / society (job) / gang account
+name, or the number of an issued bank card (spaces or dashes between groups of four are ignored). Offline characters are
+credited directly in the database; the sender and the recipient both get a statement row. Tier limits (`maxTransfer`,
+the `transfer` feature) still apply.
+
+| Option | Default | Effect |
+|---|---|---|
+| `Config.Transfers.allowOffline` | `true` | `false` = the recipient must be online (previous behaviour) |
+| `Config.Transfers.allowSharedAccounts` | `true` | allow shared, society and gang account names |
+| `Config.Transfers.allowCardNumbers` | `true` | allow a bank card number; it resolves to the character the card was issued to |
+
+Card numbers are looked up in stored inventories, so a card that was only just ordered resolves after the issuing
+character's inventory has been saved.

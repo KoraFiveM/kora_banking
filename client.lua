@@ -323,13 +323,13 @@ local function appDefinition()
                 {
                     id = 'player', label = 'Another player',
                     content = {
-                        title = 'Send to another player', description = 'The recipient must be online for a player transfer to complete.',
+                        title = 'Send to another player', description = (Config.Transfers and Config.Transfers.allowOffline == false) and 'The recipient must be online for a player transfer to complete.' or 'Send money to a personal account number, a shared or business account name, or a bank card number. The recipient can be offline.',
                         actions = {
                     {
                         id = 'banking:transfer:player', label = 'To another player', icon = 'arrow-right', variant = 'secondary',
                         fields = {
                             { id = 'from', label = 'From', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
-                            { id = 'recipient', label = 'Recipient account number', type = 'text', required = true, minLength = 1 },
+                            { id = 'recipient', label = (Config.Transfers and Config.Transfers.allowCardNumbers == false) and 'Recipient account number' or 'Recipient account or card number', type = 'text', required = true, minLength = 1 },
                             { id = 'amount', label = 'Amount', type = 'number', min = minTransfer, max = maxTransfer, required = true,
                                 placeholder = '0', presets = amountPresets(), description = 'Each source account option shows its current available balance.' .. (minTransfer > 1 and (' Minimum transfer: ' .. money(minTransfer) .. '.') or '') .. transferNote },
                             { id = 'reason', label = 'Reference', type = 'text', placeholder = 'Optional', maxLength = 50 },

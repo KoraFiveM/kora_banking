@@ -10,6 +10,13 @@ Config = {
     useDailyLimit = true,
     dailyLimit = 5000,
     minAmount = { withdraw = 1, deposit = 1, transfer = 1 },
+    -- Player-to-player transfers (bank counter, "Another player" tab). The recipient field accepts a character account
+    -- number (citizen ID), a shared / society / gang account name, or a bank card number.
+    Transfers = {
+        allowOffline = true,        -- credit characters who are offline (written straight to the database); false = recipient must be online
+        allowSharedAccounts = true, -- allow sending to shared, society (job) and gang accounts by account name
+        allowCardNumbers = true,    -- allow a bank card number in place of the account number
+    },
     migrationRetrySeconds = 0,
     maxAccounts = 2,
     maxSharedMembers = 10,
@@ -119,6 +126,18 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 1,
         label = 'Minimum transfer ($)', advanced = false,
         description = 'Smallest amount a player may transfer (between own accounts and to other players). Enforced by the server and shown in the input. 1 keeps the previous behaviour; set it to 5 for a $5 minimum. Applies immediately.',
+    })
+    Config.Transfers.allowOffline = config.boolean(Config.Transfers.allowOffline, {
+        label = 'Allow transfers to offline players', advanced = false,
+        description = 'When on, a transfer to a character who is offline is credited directly in the database and logged for both sides. Turn off to require the recipient to be online (the previous behaviour). Applies immediately; the transfer form text updates after the next config sync.',
+    })
+    Config.Transfers.allowSharedAccounts = config.boolean(Config.Transfers.allowSharedAccounts, {
+        label = 'Allow transfers to shared and business accounts', advanced = false,
+        description = 'Lets players enter a shared, society (job) or gang account name as the recipient. Applies immediately.',
+    })
+    Config.Transfers.allowCardNumbers = config.boolean(Config.Transfers.allowCardNumbers, {
+        label = 'Allow transfers by bank card number', advanced = false,
+        description = 'Lets players enter the 16-digit number of an issued bank card instead of the account number; the money goes to the personal account of the character the card was issued to. Applies immediately.',
     })
     Config.migrationRetrySeconds = config.integer(Config.migrationRetrySeconds, {
         min = 0, max = 3600,

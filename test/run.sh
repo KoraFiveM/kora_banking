@@ -11,3 +11,4 @@ lua test/minamount_docs.lua
 lua test/migrations.lua
 lua test/tiers.lua
 lua test/tiers_docs.lua
+lua test/transfers.lua
