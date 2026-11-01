@@ -62,18 +62,37 @@ function BankingDates.fields(ms, offsetSeconds)
 end
 
 -- Client only: the UTC offset in seconds of the player machine (0 when natives are missing or unsynced).
+-- GetLocalTime is the player machine clock; GetUtcTime is the same instant in UTC, so their difference is the zone offset.
+-- GetCloudTimeAsInt is only a fallback because it is 0 until the cloud time has synced.
 function BankingDates.localOffset()
     local ok, offset = pcall(function()
-        local localTime, cloudTime = rawget(_G, 'GetLocalTime'), rawget(_G, 'GetCloudTimeAsInt')
-        if type(localTime) ~= 'function' or type(cloudTime) ~= 'function' then return 0 end
+        local localTime = rawget(_G, 'GetLocalTime')
+        if type(localTime) ~= 'function' then return 0 end
         local y, mo, d, h, mi, s = localTime()
-        local asUtc = utcMillis(y, mo, d, h, mi, s)
-        local utc = tonumber(cloudTime())
-        if not asUtc or not utc or utc <= 0 then return 0 end
-        local diff = math.floor((asUtc // 1000 - utc) / 900 + 0.5) * 900
+        local asLocal = utcMillis(y, mo, d, h, mi, s)
+        if not asLocal then return 0 end
+        local utcSeconds
+        local utcTime = rawget(_G, 'GetUtcTime')
+        if type(utcTime) == 'function' then
+            local uy, umo, ud, uh, umi, us = utcTime()
+            local asUtc = utcMillis(uy, umo, ud, uh, umi, us)
+            utcSeconds = asUtc and asUtc // 1000
+        end
+        if not utcSeconds then
+            local cloudTime = rawget(_G, 'GetCloudTimeAsInt')
+            utcSeconds = type(cloudTime) == 'function' and tonumber(cloudTime()) or nil
+        end
+        if not utcSeconds or utcSeconds <= 0 then return 0 end
+        local diff = math.floor((asLocal // 1000 - utcSeconds) / 900 + 0.5) * 900
         return math.abs(diff) <= 14 * 3600 and diff or 0
     end)
     return ok and tonumber(offset) or 0
+end
+
+-- Config.dateTimezone -> 'player' or 'server'. The older values 'local' and 'utc' keep working.
+function BankingDates.timeZoneMode(value)
+    if value == 'server' or value == 'utc' then return 'server' end
+    return 'player'
 end
 
 local LOCALE_LAYOUT = { us = 'MM/DD/YYYY', ca = 'MM/DD/YYYY', ph = 'MM/DD/YYYY' }

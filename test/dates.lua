@@ -49,7 +49,16 @@ equal(D.localOffset(), 0, 'localOffset is 0 without natives')
 _G.GetLocalTime = function() return 2026, 10, 29, 21, 20, 0 end
 _G.GetCloudTimeAsInt = function() return ms // 1000 end
 equal(D.localOffset(), -5 * 3600, 'localOffset from natives')
-_G.GetLocalTime, _G.GetCloudTimeAsInt = nil, nil
+equal(D.timeZoneMode('local'), 'player', 'legacy local maps to player')
+equal(D.timeZoneMode('utc'), 'server', 'legacy utc maps to server')
+equal(D.timeZoneMode('server'), 'server', 'server mode')
+equal(D.timeZoneMode(nil), 'player', 'player is the default')
+-- GetUtcTime is preferred and works while the cloud time has not synced (0)
+_G.GetCloudTimeAsInt = function() return 0 end
+_G.GetUtcTime = function() return 2026, 10, 30, 2, 20, 0 end
+_G.GetLocalTime = function() return 2026, 10, 29, 22, 20, 0 end
+equal(D.localOffset(), -4 * 3600, 'localOffset from GetUtcTime without cloud time')
+_G.GetLocalTime, _G.GetCloudTimeAsInt, _G.GetUtcTime = nil, nil, nil
 os = realOs
 -- Both UNION halves must project the date as Unix milliseconds, whatever the table column type.
 local source = assert(io.open(root .. 'server.lua')):read('a')

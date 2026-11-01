@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Send, Settings, ShieldCheck, Trash2, UserRound, Users, WalletCards, X,
 } from "lucide-react"
 import { FormEvent, useEffect, useMemo, useState } from "react"
-import { Account, fetchNui, money, relativeDate, Snapshot } from "./lib"
+import { Account, fetchNui, money, formatTransactionDate, Snapshot } from "./lib"
 
 type View = "activity" | "cash" | "transfer" | "manage"
 type NuiResult = { ok: boolean; error?: string; result?: { message: string; snapshot: Snapshot }; snapshot?: Snapshot }
@@ -123,7 +123,7 @@ function Activity({ account, snapshot }: { account: Account; snapshot: Snapshot 
   return <div className="card overflow-hidden"><div className="border-b border-border px-5 py-4"><h2 className="font-semibold">Recent activity</h2><p className="mt-0.5 text-xs text-muted-foreground">Latest transactions for {account.owner}</p></div>
     {rows.length === 0 ? <div className="flex h-56 flex-col items-center justify-center text-muted-foreground"><ArrowRightLeft className="mb-3 h-6 w-6" /><p className="text-sm">No transactions yet</p></div> : <div className="scroll-thin max-h-[430px] divide-y divide-border overflow-y-auto">{rows.map((row) => {
       const incoming = row.statement_type === "deposit"
-      return <div key={row.id} className="flex items-center gap-4 px-5 py-3.5"><span className={`flex h-9 w-9 items-center justify-center rounded-full ${incoming ? "bg-success/10 text-success" : "bg-surface-raised text-muted-foreground"}`}>{incoming ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{row.reason || (incoming ? "Deposit" : "Withdrawal")}</span><span className="block text-xs text-muted-foreground">{relativeDate(row.date)}{row.citizenid ? ` · ${row.citizenid}` : ""}</span></span><span className={`font-mono text-sm font-semibold tabular-nums ${incoming ? "text-success" : "text-foreground"}`}>{incoming ? "+" : "−"}{money(row.amount)}</span></div>
+      return <div key={row.id} className="flex items-center gap-4 px-5 py-3.5"><span className={`flex h-9 w-9 items-center justify-center rounded-full ${incoming ? "bg-success/10 text-success" : "bg-surface-raised text-muted-foreground"}`}>{incoming ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{row.reason || (incoming ? "Deposit" : "Withdrawal")}</span><span className="block text-xs text-muted-foreground">{formatTransactionDate(row.date, snapshot.dates)}{row.citizenid ? ` · ${row.citizenid}` : ""}</span></span><span className={`font-mono text-sm font-semibold tabular-nums ${incoming ? "text-success" : "text-foreground"}`}>{incoming ? "+" : "−"}{money(row.amount)}</span></div>
     })}</div>}
   </div>
 }
