@@ -480,7 +480,7 @@ local function refreshApp()
             local snapshot, err = request('pin', values.pin)
             if not snapshot then
                 local message = err or 'Invalid PIN.'
-                if Kora.notify and Kora.notify.send then notify(message) end
+                notify(message)
                 return { notice = { tone = 'destructive', message = message } }
             end
             currentSnapshot = snapshot
@@ -589,14 +589,13 @@ local function registerBranchTargets()
     branchTargetIds = {}
 
     for index in ipairs(Config.locations) do
-        local branchIndex = index
         local info = BankingTiers.info(index)
         branchTargetIds[index] = exports.kora_target:addSphereZone({
             coords = info.coords,
             radius = 1.2,
             options = {
                 { icon = 'building-columns', label = info.enabled and info.label and ('Open %s'):format(info.label) or 'Open bank',
-                    distance = 1.8, onSelect = function() open('bank', branchIndex) end },
+                    distance = 1.8, onSelect = function() open('bank', index) end },
             },
         })
     end

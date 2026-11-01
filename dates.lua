@@ -74,20 +74,20 @@ end
 function BankingDates.localOffset()
     local ok, offset = pcall(function()
         local localTime = native('GetLocalTime')
-        if type(localTime) ~= 'function' then return 0 end
+        if not localTime then return 0 end
         local y, mo, d, h, mi, s = localTime()
         local asLocal = utcMillis(y, mo, d, h, mi, s)
         if not asLocal then return 0 end
         local utcSeconds
         local utcTime = native('GetUtcTime')
-        if type(utcTime) == 'function' then
+        if utcTime then
             local uy, umo, ud, uh, umi, us = utcTime()
             local asUtc = utcMillis(uy, umo, ud, uh, umi, us)
             utcSeconds = asUtc and asUtc // 1000
         end
         if not utcSeconds then
             local cloudTime = native('GetCloudTimeAsInt')
-            utcSeconds = type(cloudTime) == 'function' and tonumber(cloudTime()) or nil
+            utcSeconds = cloudTime and tonumber(cloudTime()) or nil
         end
         if not utcSeconds or utcSeconds <= 0 then return 0 end
         local diff = math.floor((asLocal // 1000 - utcSeconds) / 900 + 0.5) * 900
