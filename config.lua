@@ -26,8 +26,8 @@ Config = {
     -- { coords = vector3/vector4, tier = 'fleeca' | 'bigbank' | <your tier>, label = 'Shown in the app header and on the map' }.
     locations = {
         { coords = vector3(149.05, -1041.3, 29.37), tier = 'fleeca', label = 'Fleeca Bank - Legion Square' },
-        { coords = vector3(313.32, -280.03, 54.17), tier = 'fleeca', label = 'Fleeca Bank - Alta Street' },
-        { coords = vector3(-351.94, -50.72, 49.04), tier = 'fleeca', label = 'Fleeca Bank - Hawick Avenue' },
+        { coords = vector3(313.32, -280.03, 54.17), tier = 'fleeca', label = 'Fleeca Bank - Alta' },
+        { coords = vector3(-351.94, -50.72, 49.04), tier = 'fleeca', label = 'Fleeca Bank - Burton' },
         { coords = vector3(-1212.68, -331.83, 37.78), tier = 'fleeca', label = 'Fleeca Bank - Rockford Plaza' },
         { coords = vector3(-2961.67, 482.31, 15.7), tier = 'fleeca', label = 'Fleeca Bank - Great Ocean Highway' },
         { coords = vector3(1175.64, 2707.71, 38.09), tier = 'fleeca', label = 'Fleeca Bank - Harmony' },
