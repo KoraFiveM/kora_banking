@@ -299,10 +299,6 @@ local function branchAt(src, index)
     return BankingTiers.resolve(GetEntityCoords(ped), BRANCH_RANGE)
 end
 
-local function nearBranch(src, index)
-    return branchAt(src, index) ~= nil
-end
-
 -- Returns an error message when the branch's tier blocks the feature (always nil while tiers are disabled).
 local function tierBlocks(branch, feature, what)
     if BankingTiers.can(branch, feature) then return nil end
@@ -416,10 +412,8 @@ local function transactCash(src, data, current, payload)
         return ('Deposited $%s.'):format(amount)
     end
 
-    if current.mode == 'atm' and Config.useDailyLimit then
-        if amount > dailyWithdrawalRemaining(data) then
-            return nil, 'Above the limit of what you may withdraw at this ATM.'
-        end
+    if current.mode == 'atm' and Config.useDailyLimit and amount > dailyWithdrawalRemaining(data) then
+        return nil, 'Above the limit of what you may withdraw at this ATM.'
     end
     local counterCap = current.mode == 'bank' and BankingTiers.limit(current.branch, 'dailyWithdraw') or nil
     if counterCap and amount > dailyWithdrawalRemaining(data, counterCap) then
@@ -672,7 +666,7 @@ local function openBanking(src, mode, location)
         session(src, mode, false, location)
         return snapshot(src, mode, false)
     end
-    if not nearBranch(src, location) then return nil, 'Move closer to a bank counter.' end
+    if not branchAt(src, location) then return nil, 'Move closer to a bank counter.' end
     session(src, mode, true, location)
     return snapshot(src, mode, true, branchAt(src, location))
 end
@@ -802,13 +796,13 @@ bankingExport('CreateBankStatement', createBankStatement)
 local function addMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, amount) then return false end
-    statement(0, name, amount, reason or 'External deposit', 'deposit', nil)
+    statement(0, name, amount, reason or 'External deposit', 'deposit')
     return true
 end
 local function removeMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, -amount) then return false end
-    statement(0, name, amount, reason or 'External withdrawal', 'withdraw', nil)
+    statement(0, name, amount, reason or 'External withdrawal', 'withdraw')
     return true
 end
 bankingExport('AddMoney', addMoney)
