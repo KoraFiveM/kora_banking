@@ -17,12 +17,20 @@ export type Transaction = {
   date: string | number
 }
 
+export type DateOptions = {
+  format?: string
+  showTime?: boolean
+  /** "player" formats in the browser's own time zone, "server" in UTC. */
+  timeZone?: "player" | "server"
+}
+
 export type Snapshot = {
   mode: "bank" | "atm"
   locked: boolean
   profile: { name: string; accountNumber: string; cash: number }
   accounts: Account[]
   transactions: Record<string, Transaction[]>
+  dates?: DateOptions
   limits: { daily?: number; maxAccounts: number }
 }
 
@@ -46,7 +54,28 @@ export function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value)
 }
 
-export function relativeDate(value: string | number) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? "Recently" : date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+/**
+ * Formats a transaction epoch (Unix milliseconds) honouring Config.dateFormat / showTime / dateTimezone.
+ * Returns the fallback (the server-formatted string, or "Recently") when the epoch is missing or invalid.
+ */
+export function formatTransactionDate(value: string | number | null | undefined, options: DateOptions = {}, fallback = "Recently") {
+  const epoch = typeof value === "string" && value.trim() !== "" ? Number(value) : value
+  if (typeof epoch !== "number" || !Number.isFinite(epoch) || epoch <= 0) return fallback
+  const date = new Date(epoch < 100000000000 ? epoch * 1000 : epoch)
+  if (Number.isNaN(date.getTime())) return fallback
+  try {
+    const timeZone = options.timeZone === "server" ? "UTC" : undefined
+    const showTime = options.showTime !== false
+    const layout = options.format
+    if (layout !== "DD/MM/YYYY" && layout !== "MM/DD/YYYY" && layout !== "YYYY-MM-DD") {
+      return date.toLocaleString([], { timeZone, year: "numeric", month: "2-digit", day: "2-digit", ...(showTime ? { hour: "numeric", minute: "2-digit" } : {}) })
+    }
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(date).map((part) => [part.type, part.value]))
+    const text = layout.replace("YYYY", parts.year).replace("MM", parts.month).replace("DD", parts.day)
+    return showTime ? `${text} ${parts.hour}:${parts.minute}` : text
+  } catch {
+    return fallback
+  }
 }

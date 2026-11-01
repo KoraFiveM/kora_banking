@@ -6,7 +6,7 @@ Config = {
     atmAccessTime = 1500,
     dateFormat = 'locale',
     showTime = true,
-    dateTimezone = 'local',
+    dateTimezone = 'player', -- 'player' = each player time zone, 'server' = server time (UTC) for everyone
     useDailyLimit = true,
     dailyLimit = 5000,
     minAmount = { withdraw = 1, deposit = 1, transfer = 1 },
@@ -63,10 +63,11 @@ if Kora and Kora.config and Kora.config.adopt then
         label = 'Show time with transaction dates', advanced = false,
         description = 'Appends the hour and minute to each transaction date in Activity. Turn off to show the date only. Applies the next time Activity is opened.',
     })
+    if Config.dateTimezone == 'local' then Config.dateTimezone = 'player' elseif Config.dateTimezone == 'utc' then Config.dateTimezone = 'server' end
     Config.dateTimezone = config.enum(Config.dateTimezone, {
-        options = { { value = 'local', label = 'Player local time' }, { value = 'utc', label = 'UTC' } },
+        options = { { value = 'player', label = 'Player local time' }, { value = 'server', label = 'Server time (UTC)' } },
         label = 'Transaction date timezone', advanced = false,
-        description = 'Timezone used for Activity dates. local uses the clock offset of each player machine; utc shows the same time for everyone. Applies the next time Activity is opened.',
+        description = 'Timezone used for Activity dates. player shows each transaction in the time zone of the player machine (a player in New York sees Eastern time); server shows server time (UTC) to everyone. The older values local and utc still work. Applies the next time Activity is opened.',
     })
     Config.useDailyLimit = config.boolean(Config.useDailyLimit, {
         label = 'Limit daily ATM withdrawals', advanced = false,

@@ -277,6 +277,7 @@ local function snapshot(src, mode, unlocked)
         },
         accounts = unlocked == false and {} or list,
         transactions = unlocked == false and {} or transactionRows(data, list),
+        dates = { format = Config.dateFormat, showTime = Config.showTime, timeZone = BankingDates.timeZoneMode(Config.dateTimezone) },
         limits = { daily = Config.useDailyLimit and dailyWithdrawalRemaining(data) or nil, maxAccounts = Config.maxAccounts,
             min = { withdraw = minimumAmount('withdraw'), deposit = minimumAmount('deposit'), transfer = minimumAmount('transfer') } },
     }
