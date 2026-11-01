@@ -23,6 +23,10 @@ _G.GetEntityCoords = function(entity)
 end
 _G.GetClosestObjectOfType = function() return 44 end
 _G.joaat = function(value) return value end
+local stoppedAnims, targetExists = 0, true
+_G.DoesEntityExist = function() return targetExists end
+_G.StopAnimTask = function() stoppedAnims = stoppedAnims + 1 end
+_G.RemoveAnimDict = function() end
 _G.promise = { new = function()
     local value = {}
     function value:resolve(result) self.value = result end
@@ -118,6 +122,7 @@ local function tab(candidate, id)
 end
 
 truthy(contains(Config.atmModels, 'gabz_sm_pb_atmframe'), 'the Gabz Fleeca ATM frame is targetable')
+truthy(contains(Config.atmModels, 'v_5_b_atm1') and contains(Config.atmModels, 'v_5_b_atm2'), 'bank lobby wall ATMs are targetable')
 equal(#createdBlips, #Config.locations, 'every configured branch creates one kora_lib-owned marker')
 equal(createdBlips[1].options.category, 'Bank', 'branch markers share the canonical Bank category')
 equal(createdBlips[1].options.name, nil, 'generic bank markers do not repeat the category as a name')
@@ -274,3 +279,22 @@ equal(branchOptions[1].label, 'Open Blaine County Savings', 'a config update re-
 Config.tiers.enabled = false
 
 print(('qbbanking client: %d assertions passed'):format(passed))
+
+-- The ATM animation is always stopped, and a failing progress bar notifies instead of leaving the player stuck.
+local realStart = Kora.progressbar.start
+local noticesBefore, stopsBefore = #notifications, stoppedAnims
+Kora.progressbar.start = function(payload)
+    equal(payload.anim.duration, Config.atmAccessTime, 'the ATM clip is bounded by the access time')
+    return false
+end
+atmOptions[1].onSelect(44)
+equal(stoppedAnims, stopsBefore + 1, 'cancelling the ATM bar stops the animation')
+Kora.progressbar.start = function() error('boom') end
+atmOptions[1].onSelect(44)
+equal(stoppedAnims, stopsBefore + 2, 'a crashing ATM bar still stops the animation')
+equal(#notifications, noticesBefore + 1, 'a crashing ATM bar notifies the player')
+Kora.progressbar.start = function() return false, 'A progress bar is already active.' end
+atmOptions[1].onSelect(44)
+equal(notifications[#notifications].message, 'A progress bar is already active.', 'a refused ATM bar explains why')
+Kora.progressbar.start = realStart
+atmOptions[1].onSelect(44)

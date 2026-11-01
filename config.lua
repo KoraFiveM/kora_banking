@@ -1,8 +1,13 @@
 Config = {
     transactionCallers = { kora_housing = true },
     ui = { accent = nil },
-    atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe' },
+    atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe',
+        -- Wall ATMs inside bank lobbies (Pacific Standard / big bank).
+        'v_5_b_atm1', 'v_5_b_atm2' },
     atmDistance = 1.8,
+    -- Extra metres on top of atmDistance between the player and the ATM (client lookup and server check).
+    -- Wall ATMs in bank lobbies are wide, so the prop centre can sit further away than the interaction distance.
+    atmTolerance = 1.0,
     atmAccessTime = 1500,
     dateFormat = 'locale',
     showTime = true,
@@ -79,6 +84,11 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 0,
         label = 'ATM interaction distance (metres)', advanced = false,
         description = 'Maximum client distance for finding or targeting an ATM; the server allows an extra 1 metre of tolerance. Restart qbbanking to apply saved changes.',
+    })
+    Config.atmTolerance = config.number(Config.atmTolerance, {
+        min = 0,
+        label = 'ATM distance tolerance (metres)', advanced = true,
+        description = 'Extra distance added to the ATM interaction distance when the client looks up the ATM and when the server verifies the player is beside it. Raise it if wall ATMs report Move closer while you stand in front of them. Restart kora_banking to apply saved changes.',
     })
     Config.atmAccessTime = config.integer(Config.atmAccessTime, {
         min = 0,

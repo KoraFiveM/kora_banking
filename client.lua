@@ -7,6 +7,7 @@ local APP_ID = 'qbbanking:bank'
 local REQUEST_TIMEOUT = 10000
 
 local openingAtm = false
+local ATM_ANIM = { dict = 'amb@prop_human_atm@male@enter', clip = 'enter' }
 local nextRequestId = 0
 local pendingRequests = {}
 local currentSnapshot
@@ -554,28 +555,46 @@ end
 
 local function nearAtm()
     local coords = GetEntityCoords(PlayerPedId())
+    local radius = Config.atmDistance + (Config.atmTolerance or 1.0)
     for _, modelName in ipairs(Config.atmModels) do
-        local entity = GetClosestObjectOfType(coords.x, coords.y, coords.z, Config.atmDistance, joaat(modelName), false, false, false)
+        local entity = GetClosestObjectOfType(coords.x, coords.y, coords.z, radius, joaat(modelName), false, false, false)
         if entity ~= 0 then return entity end
     end
 end
 
-local function accessAtm()
+-- The access animation must never outlive the attempt, whatever way it ends.
+local function stopAtmAnimation()
+    local ped = PlayerPedId()
+    pcall(function() StopAnimTask(ped, ATM_ANIM.dict, ATM_ANIM.clip, 8.0) end)
+    pcall(function() RemoveAnimDict(ATM_ANIM.dict) end)
+end
+
+-- target = the entity the player aimed at (kora_target passes it to onSelect); events pass nothing.
+local function accessAtm(target)
     if openingAtm or appOpen then return end
-    local entity = nearAtm()
+    local entity = type(target) == 'number' and target ~= 0 and DoesEntityExist(target) and target or nearAtm()
     if not entity then return notify('Move closer to an ATM.') end
 
     openingAtm = true
     CreateThread(function()
-        local completed = Kora.progressbar.start({
+        local ok, completed, err = pcall(Kora.progressbar.start, {
             label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
             disable = { move = true, combat = true, car = true },
-            anim = { dict = 'amb@prop_human_atm@male@enter', clip = 'enter' },
+            -- The clip is bounded by the access time so it can not loop if the bar is never cleaned up.
+            anim = { dict = ATM_ANIM.dict, clip = ATM_ANIM.clip, duration = Config.atmAccessTime > 0 and Config.atmAccessTime or nil },
             props = { { model = 'prop_cs_credit_card', bone = 28422, offset = vector3(0.1, 0.03, -0.05), rotation = vector3(0.0, 0.0, 180.0) } },
         })
         openingAtm = false
-        if not completed then return end
-        entity = nearAtm()
+        stopAtmAnimation()
+        if not ok then
+            print(('[kora_banking] ATM progress bar failed: %s'):format(tostring(completed)))
+            return notify('The ATM could not be started. Try again.')
+        end
+        if not completed then
+            if err then notify(err) end
+            return
+        end
+        if not DoesEntityExist(entity) then entity = nearAtm() end
         if not entity then return notify('Move closer to an ATM.') end
         local coords = GetEntityCoords(entity)
         open('atm', { x = coords.x, y = coords.y, z = coords.z })

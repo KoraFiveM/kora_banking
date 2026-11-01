@@ -20,7 +20,7 @@
 - `kora_target`
 - `kora_inventory`
 
-ATMs are available on the models in `Config.atmModels`. Players can order a bank card and choose its PIN at a branch, then target an ATM or use the card while standing beside one. `Config.atmDistance`, `Config.atmAccessTime`, `Config.useDailyLimit`, and `Config.dailyLimit` control the ATM flow.
+ATMs are available on the models in `Config.atmModels`. Players can order a bank card and choose its PIN at a branch, then target an ATM or use the card while standing beside one. `Config.atmDistance`, `Config.atmTolerance` (extra metres for wide wall ATMs, default `1.0`), `Config.atmAccessTime`, `Config.useDailyLimit`, and `Config.dailyLimit` control the ATM flow.
 
 ## Bank tiers (Fleeca Bank vs Pacific Standard)
 

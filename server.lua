@@ -312,7 +312,7 @@ local function nearAtm(src, location)
     if x ~= x or y ~= y or z ~= z or math.abs(x) > 10000 or math.abs(y) > 10000 or math.abs(z) > 2000 then return false end
     local ped = GetPlayerPed(src)
     if ped == 0 then return false end
-    return #(GetEntityCoords(ped) - vector3(x, y, z)) <= Config.atmDistance + 1.0
+    return #(GetEntityCoords(ped) - vector3(x, y, z)) <= Config.atmDistance + (Config.atmTolerance or 1.0)
 end
 
 local function session(src, mode, unlocked, location)
