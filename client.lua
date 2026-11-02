@@ -576,6 +576,14 @@ local function accessAtm(target)
 
     openingAtm = true
     CreateThread(function()
+        -- Refuse before any animation or progress bar when the player has no bank card (the server stays the authority).
+        if Config.requireBankCard ~= false then
+            local hasCard, cardErr = request('atmCard')
+            if not hasCard then
+                openingAtm = false
+                return notify(cardErr or 'You need a bank card to use an ATM.')
+            end
+        end
         local ok, completed, err = pcall(Kora.progressbar.start, {
             label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
             disable = { move = true, combat = true, car = true },

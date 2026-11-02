@@ -335,6 +335,10 @@ local function hasBankCard(src)
     return exports.kora_core:getItemByName(src, 'bank_card') ~= nil
 end
 
+local function atmCardMissing(src)
+    return Config.requireBankCard ~= false and not hasBankCard(src)
+end
+
 local function cardPins(src)
     local citizenid = exports.kora_core:getPlayerData(src, { 'citizenid' })
     if not citizenid then return {} end
@@ -661,10 +665,11 @@ local function openBanking(src, mode, location)
     if not ready then return nil, 'Banking is still starting.' end
     mode = mode == 'atm' and 'atm' or 'bank'
     if mode == 'atm' then
-        if not hasBankCard(src) then return nil, 'You need a bank card to use an ATM.' end
+        if atmCardMissing(src) then return nil, 'You need a bank card to use an ATM.' end
         if not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
-        session(src, mode, false, location)
-        return snapshot(src, mode, false)
+        local unlocked = Config.requireBankCard == false
+        session(src, mode, unlocked, location)
+        return snapshot(src, mode, unlocked)
     end
     if not branchAt(src, location) then return nil, 'Move closer to a bank counter.' end
     session(src, mode, true, location)
@@ -676,6 +681,12 @@ local function openCallback(src, mode, location)
     if ok then return result, err end
     print(('^1[qbbanking]^7 open failed for %s: %s'):format(src, tostring(result)))
     return nil, 'The bank encountered an internal error.'
+end
+
+-- Quick pre-check so the client can refuse before the animation and progress bar; openBanking stays the authority.
+local function atmCardCallback(src)
+    if atmCardMissing(src) then return nil, 'You need a bank card to use an ATM.' end
+    return true
 end
 
 local function pinCallback(src, pin)
@@ -748,6 +759,7 @@ RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
     if type(requestId) ~= 'number' or requestId % 1 ~= 0 or requestId < 1 then return end
 
     local handler = operation == 'open' and openCallback
+        or operation == 'atmCard' and atmCardCallback
         or operation == 'pin' and pinCallback
         or operation == 'action' and actionCallback
     if not handler then

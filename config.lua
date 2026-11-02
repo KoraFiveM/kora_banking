@@ -9,6 +9,9 @@ Config = {
     -- Wall ATMs in bank lobbies are wide, so the prop centre can sit further away than the interaction distance.
     atmTolerance = 1.0,
     atmAccessTime = 1500,
+    -- true: an ATM needs a bank card in the inventory and the card PIN. The server checks the card before the animation and progress bar start.
+    -- false: no card is needed and the ATM opens without a PIN.
+    requireBankCard = true,
     dateFormat = 'locale',
     showTime = true,
     dateTimezone = 'player', -- 'player' = each player time zone, 'server' = server time (UTC) for everyone
@@ -94,6 +97,10 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 0,
         label = 'ATM access time (milliseconds)', advanced = false,
         description = 'Duration of the cancellable progress bar before opening an ATM. 1000 milliseconds equals 1 second. Restart qbbanking to apply saved changes.',
+    })
+    Config.requireBankCard = config.boolean(Config.requireBankCard, {
+        label = 'Require a bank card at ATMs', advanced = false,
+        description = 'When on, players need a bank card in their inventory and its PIN to use an ATM; without a card only the error notification shows (no animation or progress bar). When off, ATMs open without a card or PIN. Applies immediately.',
     })
     Config.dateFormat = config.enum(Config.dateFormat, {
         options = {

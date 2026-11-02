@@ -50,9 +50,14 @@ local unlockedAtm = {
     limits = { daily = 5000, maxAccounts = 2 },
 }
 
+noCard = false
 _G.TriggerServerEvent = function(name, requestId, operation, mode)
     if name == 'qbbanking:close' then return end
     local result
+    if operation == 'atmCard' then
+        netEvents['qbbanking:client:response'](requestId, (not noCard) or nil, noCard and 'You need a bank card to use an ATM.' or nil)
+        return
+    end
     if operation == 'open' then result = mode == 'atm' and lockedAtm or bankSnapshot
     elseif operation == 'pin' then
         result = pinError and nil or unlockedAtm
@@ -305,5 +310,20 @@ equal(#notifications, noticesBefore + 1, 'a crashing ATM bar notifies the player
 Kora.progressbar.start = function() return false, 'A progress bar is already active.' end
 atmOptions[1].onSelect(44)
 equal(notifications[#notifications].message, 'A progress bar is already active.', 'a refused ATM bar explains why')
+Kora.progressbar.start = realStart
+
+-- No bank card: only the error notification, no progress bar and no animation.
+noCard = true
+local barCalls, noticesNoCard = 0, #notifications
+Kora.progressbar.start = function() barCalls = barCalls + 1 return true end
+atmOptions[1].onSelect(44)
+equal(barCalls, 0, 'no bank card starts no progress bar or animation')
+equal(notifications[#notifications].message, 'You need a bank card to use an ATM.', 'no bank card shows the error notification')
+equal(#notifications, noticesNoCard + 1, 'no bank card shows exactly one notification')
+Config.requireBankCard = false
+atmOptions[1].onSelect(44)
+equal(barCalls, 1, 'requireBankCard=false leaves the ATM flow unchanged')
+Config.requireBankCard = true
+noCard = false
 Kora.progressbar.start = realStart
 atmOptions[1].onSelect(44)
