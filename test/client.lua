@@ -127,6 +127,9 @@ local function tab(candidate, id)
 end
 
 truthy(contains(Config.atmModels, 'gabz_sm_pb_atmframe'), 'the Gabz Fleeca ATM frame is targetable')
+for _, model in ipairs({ 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm' }) do
+    truthy(contains(Config.atmModels, model), model .. ' is a targetable ATM model')
+end
 truthy(contains(Config.atmModels, 'v_5_b_atm1') and contains(Config.atmModels, 'v_5_b_atm2'), 'bank lobby wall ATMs are targetable')
 equal(#createdBlips, #Config.locations, 'every configured branch creates one kora_lib-owned marker')
 equal(createdBlips[1].options.category, 'Bank', 'branch markers share the canonical Bank category')

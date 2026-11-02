@@ -635,17 +635,29 @@ end
 local atmTargetId
 local function registerAtmTargets()
     if atmTargetId then pcall(function() exports.kora_target:removeModel(Config.atmModels, atmTargetId) end) end
-    atmTargetId = exports.kora_target:addModel(Config.atmModels, {
-        { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
-    }, Config.atmDistance)
+    atmTargetId = nil
+    local ok, result = pcall(function()
+        return exports.kora_target:addModel(Config.atmModels, {
+            { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
+        }, Config.atmDistance)
+    end)
+    if ok then atmTargetId = result else print(('[kora_banking] ATM target registration failed: %s'):format(tostring(result))) end
 end
 
-registerBranchTargets()
-registerAtmTargets()
+-- ATMs register first and each registration is isolated: a failing bank-branch zone must never stop ATMs from registering.
+local function registerTargets()
+    registerAtmTargets()
+    local ok, err = pcall(registerBranchTargets)
+    if not ok then print(('[kora_banking] bank branch target registration failed: %s'):format(tostring(err))) end
+end
+
+registerTargets()
 AddEventHandler('onClientResourceStart', function(resource)
     if resource ~= 'kora_target' then return end
-    registerBranchTargets()
-    registerAtmTargets()
+    -- kora_target restarted: its registry is empty and its ids restart, so stale ids must not be removed (they could hit another resource's targets).
+    atmTargetId = nil
+    branchTargetIds = {}
+    registerTargets()
 end)
 
 -- With tiers enabled each marker takes its tier's sprite/colour/scale and the location label as its name.

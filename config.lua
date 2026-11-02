@@ -1,6 +1,8 @@
 Config = {
     transactionCallers = { kora_housing = true },
     ui = { accent = nil },
+    -- Props treated as ATMs by the targeting eye. Default covers every standard GTA ATM (prop_atm_01/02/03, prop_fleeca_atm)
+    -- plus bank lobby wall ATMs and the Gabz frame; add a model name here for a custom map's ATM prop.
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe',
         -- Wall ATMs inside bank lobbies (Pacific Standard / big bank).
         'v_5_b_atm1', 'v_5_b_atm2' },
