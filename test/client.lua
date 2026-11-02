@@ -175,6 +175,8 @@ equal(pin.label, 'PIN', 'the PIN field label is just PIN')
 equal(pin.required, nil, 'the PIN field is not marked required (no asterisk or Required. text)')
 equal(pin.description, 'Never share your PIN with anyone.', 'the PIN hint is the share warning')
 truthy(pin.keypad and pin.numericOnly, 'the PIN field uses the compact numeric keypad')
+equal(pin.labelAlign, 'center', 'the PIN label is centred above the keypad')
+equal(pin.keypadActionVariant, 'outline', 'the keypad Clear and Backspace keys are outlined like the digits')
 equal(pin.minLength, 4, 'the PIN field requires four digits')
 equal(pin.maxLength, 4, 'the PIN field rejects extra digits')
 

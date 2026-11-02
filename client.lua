@@ -151,8 +151,11 @@ local function appDefinition()
                         description = 'Repeated incorrect PIN entries will result in a temporary account lockout.',
                         blocks = {
                             { type = 'form', id = 'atm-pin', title = 'Secure Keypad', fields = {
-                                { id = 'pin', label = 'PIN', type = 'password',
+                                -- labelAlign/keypadActionVariant need kora_lib with those field options;
+                                -- older kora_lib bundles ignore them and keep the left label and plain keys.
+                                { id = 'pin', label = 'PIN', type = 'password', labelAlign = 'center',
                                     minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true,
+                                    keypadActionVariant = 'outline',
                                     description = 'Never share your PIN with anyone.' },
                             }, action = { id = 'banking:unlock', label = 'Unlock ATM', icon = 'key', variant = 'primary' } },
                         },
@@ -376,7 +379,8 @@ local function appDefinition()
                     {
                         id = 'banking:order-card', label = 'Issue bank card', icon = 'credit-card', variant = 'secondary',
                         fields = { { id = 'pin', label = 'Choose a 4-digit PIN', type = 'password', required = true,
-                            minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true } },
+                            minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true,
+                            keypadActionVariant = 'outline' } },
                     },
                         },
                     },
