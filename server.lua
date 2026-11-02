@@ -665,7 +665,7 @@ local function openBanking(src, mode, location)
     if not ready then return nil, 'Banking is still starting.' end
     mode = mode == 'atm' and 'atm' or 'bank'
     if mode == 'atm' then
-        if atmCardMissing(src) then return nil, 'You need a bank card to use an ATM.' end
+        if atmCardMissing(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
         if not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
         local unlocked = Config.requireBankCard == false
         session(src, mode, unlocked, location)
@@ -685,7 +685,7 @@ end
 
 -- Quick pre-check so the client can refuse before the animation and progress bar; openBanking stays the authority.
 local function atmCardCallback(src)
-    if atmCardMissing(src) then return nil, 'You need a bank card to use an ATM.' end
+    if atmCardMissing(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
     return true
 end
 
@@ -693,7 +693,7 @@ local function pinCallback(src, pin)
     local current = activeSession(src)
     if not current or current.mode ~= 'atm' then return nil, 'Open an ATM first.' end
     if current.lockedUntil and current.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
-    if not hasBankCard(src) then return nil, 'You need a bank card to use an ATM.' end
+    if not hasBankCard(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
     local value = tostring(pin or '')
     if not value:match('^%d%d%d%d$') or not cardPins(src)[value] then
         current.attempts = current.attempts + 1

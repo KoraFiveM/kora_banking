@@ -610,7 +610,7 @@ local function accessAtm(target, fixed)
             local hasCard, cardErr = request('atmCard')
             if not hasCard then
                 openingAtm = false
-                return notify(cardErr or 'You need a bank card to use an ATM.')
+                return notify(cardErr or Config.atmNoCardMessage or 'You need a bank card to use an ATM.')
             end
         end
         local ok, completed, err = pcall(Kora.progressbar.start, {
@@ -659,6 +659,34 @@ end
 -- Config.atmCoords adds sphere zones for ATMs that are baked into the map and never hit as an entity.
 local atmTargetId
 local atmZoneIds = {}
+local atmHashes = {}
+local CARD_CHECK_MS = 5000
+local cardKnown, cardCheckedAt, cardChecking = false, -CARD_CHECK_MS, false
+
+local function isAtmEntity(entity)
+    if type(entity) ~= 'number' or entity == 0 then return false end
+    local ok, model = pcall(GetEntityModel, entity)
+    return ok and atmHashes[model] == true
+end
+
+-- Only used when Config.atmAlwaysShowTarget is off: shows the target from the server's last card answer (refreshed on demand
+-- while the player aims, never in a loop). Selecting the option still asks the server, which stays the authority.
+local function cardAllowsTarget()
+    if Config.requireBankCard == false then return true end
+    if not cardChecking and GetGameTimer() - cardCheckedAt >= CARD_CHECK_MS then
+        cardChecking = true
+        CreateThread(function()
+            local hasCard = request('atmCard')
+            cardKnown, cardCheckedAt, cardChecking = hasCard == true, GetGameTimer(), false
+        end)
+    end
+    return cardKnown
+end
+
+local function showAtmOption()
+    return Config.atmAlwaysShowTarget ~= false or cardAllowsTarget()
+end
+
 local function registerAtmZones()
     for _, zoneId in pairs(atmZoneIds) do pcall(function() exports.kora_target:removeZone(zoneId) end) end
     atmZoneIds = {}
@@ -669,7 +697,9 @@ local function registerAtmZones()
                 coords = vector3(atm.x, atm.y, atm.z),
                 radius = Config.atmZoneRadius or 1.2,
                 options = {
-                    { icon = 'credit-card', label = 'Use ATM', distance = Config.atmDistance, onSelect = function() accessAtm(nil, fixed) end },
+                    { icon = 'credit-card', label = 'Use ATM', distance = Config.atmDistance, onSelect = function() accessAtm(nil, fixed) end,
+                        -- The model target covers any ATM prop the ray resolves, so the zone only stands in where it does not.
+                        canInteract = function(entity) return not isAtmEntity(entity) and showAtmOption() end },
                 },
             })
         end)
@@ -680,10 +710,12 @@ end
 local function registerAtmTargets()
     if atmTargetId then pcall(function() exports.kora_target:removeModel(Config.atmModels, atmTargetId) end) end
     atmTargetId = nil
+    atmHashes = {}
+    for _, modelName in ipairs(Config.atmModels) do atmHashes[joaat(modelName)] = true end
     registerAtmZones()
     local ok, result = pcall(function()
         return exports.kora_target:addModel(Config.atmModels, {
-            { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
+            { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm, canInteract = showAtmOption },
         }, Config.atmDistance)
     end)
     if ok then atmTargetId = result else print(('[kora_banking] ATM target registration failed: %s'):format(tostring(result))) end

@@ -341,7 +341,9 @@ Kora.progressbar.start = realStart
 atmOptions[1].onSelect(44)
 
 -- Map-baked ATMs: Config.atmCoords registers one Use ATM zone per coordinate and opens at that coordinate, not at a prop.
-equal(#atmZones, 0, 'no fallback zones are registered while Config.atmCoords is empty')
+equal(atmZones[1].coords.x, 147.4, 'the default fallback zones cover the Legion Square Fleeca ATMs')
+equal(atmZones[2].coords.x, 145.9, 'the default fallback zones cover both Legion Square Fleeca ATMs')
+for index = #atmZones, 1, -1 do atmZones[index] = nil end
 Config.atmCoords = { vector3(111.5, 222.5, 33.5), vector3(-44.0, 55.0, 6.0) }
 dofile(root .. 'client.lua')
 equal(#atmZones, 2, 'every Config.atmCoords entry registers an ATM zone')
@@ -356,3 +358,32 @@ equal(notifications[#notifications].message, 'Move closer to an ATM.', 'away fro
 _G.GetEntityCoords = function() return vector3(111.0, 222.0, 33.0) end
 atmOptions[1].onSelect()
 equal(lastOpenLocation.x, 111.5, 'the event fallback finds a map-baked ATM from Config.atmCoords')
+
+-- Zone dedupe: a fallback zone stays out of the way while the aimed prop is already an ATM model target.
+_G.GetGameTimer = function() return 100000 end
+_G.GetEntityModel = function(entity) return entity == 77 and 'prop_atm_01' or 'prop_bench_01' end
+local zoneOption = atmZones[1].options[1]
+equal(zoneOption.canInteract(77), false, 'the fallback zone hides when the aimed entity is an ATM model')
+equal(zoneOption.canInteract(78), true, 'the fallback zone shows for other aimed entities')
+equal(zoneOption.canInteract(nil), true, 'the fallback zone shows when the ray hits no entity')
+
+-- Always-show target: with a missing card the option still shows and selecting it only notifies.
+noCard = true
+equal(atmOptions[1].canInteract(), true, 'the Use ATM target shows without a bank card by default')
+local noticesAlways = #notifications
+atmOptions[1].onSelect(44)
+equal(notifications[#notifications].message, 'You need a bank card to use an ATM.', 'the server reply is shown when it gives one')
+equal(#notifications, noticesAlways + 1, 'selecting the target without a card notifies once')
+
+-- alwaysShowTarget off: the target follows the server card answer, refreshed on demand.
+Config.atmAlwaysShowTarget = false
+equal(atmOptions[1].canInteract(), false, 'without a card the target is hidden when alwaysShowTarget is off')
+noCard = false
+_G.GetGameTimer = function() return 200000 end
+atmOptions[1].canInteract()
+equal(atmOptions[1].canInteract(), true, 'the target shows once the server reports a card')
+Config.requireBankCard = false
+noCard = true
+equal(atmOptions[1].canInteract(), true, 'the target always shows when cards are not required')
+Config.requireBankCard = true
+Config.atmAlwaysShowTarget = true

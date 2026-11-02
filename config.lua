@@ -6,9 +6,10 @@ Config = {
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe',
         -- Wall ATMs inside bank lobbies (Pacific Standard / big bank).
         'v_5_b_atm1', 'v_5_b_atm2' },
-    -- Fallback for ATMs baked into the map (not entities, so model targeting never hits them): each entry is a vector3 at the
-    -- machine and gets a "Use ATM" sphere zone of atmZoneRadius. Leave empty when every ATM resolves through atmModels.
-    atmCoords = {},
+    -- Fallback for ATMs baked into the map or whose prop the targeting ray does not resolve: each entry is a vector3 at the
+    -- machine and gets a "Use ATM" sphere zone of atmZoneRadius. A zone hides itself while the aimed prop is already an
+    -- atmModels entity, so a machine never shows two "Use ATM" options. Default: the two Fleeca ATMs in front of the Legion Square bank.
+    atmCoords = { vector3(147.4, -1035.8, 29.3), vector3(145.9, -1035.2, 29.3) },
     atmZoneRadius = 1.2,
     atmDistance = 1.8,
     -- Extra metres on top of atmDistance between the player and the ATM (client lookup and server check).
@@ -18,6 +19,10 @@ Config = {
     -- true: an ATM needs a bank card in the inventory and the card PIN. The server checks the card before the animation and progress bar start.
     -- false: no card is needed and the ATM opens without a PIN.
     requireBankCard = true,
+    -- true: "Use ATM" always shows on an ATM; a player without a bank card gets atmNoCardMessage instead of the ATM opening.
+    -- false: the target only shows for players the server reports as holding a bank card (re-checked every few seconds while aiming).
+    atmAlwaysShowTarget = true,
+    atmNoCardMessage = 'You need a bank card to use an ATM.',
     dateFormat = 'locale',
     showTime = true,
     dateTimezone = 'player', -- 'player' = each player time zone, 'server' = server time (UTC) for everyone
@@ -116,6 +121,14 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.requireBankCard = config.boolean(Config.requireBankCard, {
         label = 'Require a bank card at ATMs', advanced = false,
         description = 'When on, players need a bank card in their inventory and its PIN to use an ATM; without a card only the error notification shows (no animation or progress bar). When off, ATMs open without a card or PIN. Applies immediately.',
+    })
+    Config.atmAlwaysShowTarget = config.boolean(Config.atmAlwaysShowTarget, {
+        label = 'Always show the Use ATM target', advanced = false,
+        description = 'When on, the Use ATM target shows on every ATM and players without a bank card get the no-card message when they select it. When off, the target only shows for players holding a bank card (the server is still asked on use). Only matters while bank cards are required. Applies immediately.',
+    })
+    Config.atmNoCardMessage = config.string(Config.atmNoCardMessage, {
+        label = 'No bank card message', advanced = false,
+        description = 'Notification shown when a player without a bank card tries to use an ATM. Applies immediately.',
     })
     Config.dateFormat = config.enum(Config.dateFormat, {
         options = {
