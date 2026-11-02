@@ -60,7 +60,7 @@ function PinScreen({ snapshot, close, unlock }: { snapshot: Snapshot; close: () 
     <main className="app-surface relative w-[390px] p-6">
       <div className="absolute right-4 top-4"><CloseButton close={close} /></div>
       <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-border bg-brand-soft text-primary"><Landmark className="h-5 w-5" /></div>
-      <p className="text-xs font-semibold uppercase tracking-[.12em] text-primary">QBCore ATM</p>
+      <p className="text-xs font-semibold uppercase tracking-[.12em] text-primary">Kora ATM</p>
       <h1 className="mt-1 text-xl font-semibold">Welcome, {snapshot.profile.name.split(" ")[0]}</h1>
       <p className="mt-1 text-sm text-muted-foreground">Enter the 4-digit PIN for your bank card.</p>
       <div className="my-6 flex justify-center gap-3" aria-label={`${pin.length} of 4 PIN digits entered`}>
@@ -111,7 +111,7 @@ function CashForm({ account, cash, run, compact = false }: { account: Account; c
 function ATM({ snapshot, close, run }: { snapshot: Snapshot; close: () => void; run: (data: object) => Promise<boolean> }) {
   const account = snapshot.accounts[0]
   return <main className="app-surface w-[440px]">
-    <header className="flex items-center justify-between border-b border-border px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-primary"><Landmark className="h-4 w-4" /></span><div><p className="text-sm font-semibold">QBCore ATM</p><p className="text-xs text-muted-foreground">Personal banking</p></div></div><CloseButton close={close} /></header>
+    <header className="flex items-center justify-between border-b border-border px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-primary"><Landmark className="h-4 w-4" /></span><div><p className="text-sm font-semibold">Kora ATM</p><p className="text-xs text-muted-foreground">Personal banking</p></div></div><CloseButton close={close} /></header>
     <section className="border-b border-border bg-card px-6 py-5"><p className="text-xs uppercase tracking-[.08em] text-muted-foreground">Personal bank balance</p><p className="mt-1 font-mono text-3xl font-semibold tabular-nums">{money(account.balance)}</p><p className="mt-2 text-xs text-muted-foreground">Cash on hand · {money(snapshot.profile.cash)}{snapshot.limits.daily ? ` · ${money(snapshot.limits.daily)} daily withdrawal limit` : ""}</p></section>
     <section className="p-6"><CashForm account={account} cash={snapshot.profile.cash} run={run} compact /></section>
     <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground"><span>Session secured</span><button className="button-ghost" onClick={close}><LogOut className="h-4 w-4" />Finish</button></footer>

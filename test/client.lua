@@ -159,7 +159,16 @@ atmOptions[1].onSelect()
 local locked = apps[#apps]
 equal(locked.layout, 'compact', 'a locked ATM uses compact layout')
 equal(locked.width, 460, 'the secure keypad permits a narrow ATM frame')
-local pin = locked.navigation[1].content.blocks[2].fields[1]
+local unlockContent = locked.navigation[1].content
+equal(locked.title, 'Kora ATM', 'the locked ATM header uses Kora branding')
+equal(unlockContent.title, 'Enter your bank card PIN', 'the PIN heading has no hyphen')
+equal(unlockContent.description, 'Repeated incorrect PIN entries will result in a temporary account lockout.', 'the lockout warning replaces the server note')
+equal(#unlockContent.blocks, 1, 'the locked ATM has no Card required box')
+equal(unlockContent.blocks[1].title, 'Secure Keypad', 'the keypad form is titled Secure Keypad')
+local pin = unlockContent.blocks[1].fields[1]
+equal(pin.label, 'PIN', 'the PIN field label is just PIN')
+equal(pin.required, nil, 'the PIN field is not marked required (no asterisk or Required. text)')
+equal(pin.description, 'Never share your PIN with anyone.', 'the PIN hint is the share warning')
 truthy(pin.keypad and pin.numericOnly, 'the PIN field uses the compact numeric keypad')
 equal(pin.minLength, 4, 'the PIN field requires four digits')
 equal(pin.maxLength, 4, 'the PIN field rejects extra digits')
@@ -226,7 +235,7 @@ truthy(emptyWithdraw.disabled, 'ATM withdrawal is disabled at a zero balance')
 equal(emptyWithdraw.fields[2].max, nil, 'zero balance never produces invalid min/max bounds')
 
 -- Tiers off (default): header and markers are unchanged. Tiers on: label in the header, gated actions disabled with a clear message.
-equal(defaultBank.title, 'QBCore Bank', 'the header is unchanged while tiers are disabled')
+equal(defaultBank.title, 'Kora Bank', 'the header is unchanged while tiers are disabled')
 bankSnapshot.profile.cash = 700
 bankSnapshot.branch = {
     label = 'Fleeca Bank - Test', tier = 'fleeca', tierLabel = 'Fleeca Bank',

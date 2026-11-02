@@ -140,21 +140,20 @@ local function appDefinition()
 
     if snapshot.locked then
         return {
-            id = APP_ID, title = 'QBCore ATM', description = 'Secure cash access', icon = 'dollar-sign',
+            id = APP_ID, title = 'Kora ATM', description = 'Secure cash access', icon = 'dollar-sign',
             accent = type(Config.ui.accent) == 'string' and Config.ui.accent or nil,
-            layout = 'compact', width = 460, height = 700,
+            layout = 'compact', width = 460, height = 660,
             navigation = {
                 {
                     id = 'unlock', label = 'Verify card', icon = 'credit-card',
                     content = {
-                        title = 'Enter your bank-card PIN',
-                        description = 'Your PIN is checked only by the banking server.',
+                        title = 'Enter your bank card PIN',
+                        description = 'Repeated incorrect PIN entries will result in a temporary account lockout.',
                         blocks = {
-                            { type = 'text', title = 'Card required', text = 'Use a bank card issued to this character. Repeated incorrect PINs are temporarily locked.' },
-                            { type = 'form', id = 'atm-pin', title = 'Secure keypad', fields = {
-                                { id = 'pin', label = '4-digit PIN', type = 'password', required = true,
+                            { type = 'form', id = 'atm-pin', title = 'Secure Keypad', fields = {
+                                { id = 'pin', label = 'PIN', type = 'password',
                                     minLength = 4, maxLength = 4, pattern = '^\\d{4}$', numericOnly = true, keypad = true,
-                                    description = 'Four digits; never shared with the client resource after verification.' },
+                                    description = 'Never share your PIN with anyone.' },
                             }, action = { id = 'banking:unlock', label = 'Unlock ATM', icon = 'key', variant = 'primary' } },
                         },
                     },
@@ -453,7 +452,7 @@ local function appDefinition()
     local branchDescription = 'Secure account services'
     if branch and branch.tierLabel and branch.tierLabel ~= branchTitle then branchDescription = branch.tierLabel .. ' · ' .. branchDescription end
     return {
-        id = APP_ID, title = branchTitle or (snapshot.mode == 'atm' and 'QBCore ATM' or 'QBCore Bank'),
+        id = APP_ID, title = branchTitle or (snapshot.mode == 'atm' and 'Kora ATM' or 'Kora Bank'),
         description = snapshot.mode == 'atm' and 'Personal banking' or branchDescription, icon = 'dollar-sign',
         accent = type(Config.ui.accent) == 'string' and Config.ui.accent or nil,
         layout = snapshot.mode == 'atm' and 'compact' or 'standard',

@@ -7,7 +7,7 @@ name 'kora_banking'
 provide 'qbbanking'
 author 'qbcore2'
 version '3.0.0'
-description 'Personal, shared, society and gang banking for qbcore'
+description 'Personal, shared, society and gang banking for Kora'
 
 provide 'qb-banking'
 
