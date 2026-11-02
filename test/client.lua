@@ -3,6 +3,7 @@ local realOs = os
 os = nil
 local root = debug.getinfo(1, 'S').source:sub(2):match('(.*/)') .. '../'
 local netEvents, branchOptions, apps, atmOptions, createdBlips = {}, nil, {}, nil, {}
+local atmZones = {}
 local notifications = {}
 local removedBlips, configHandlers = {}, {}
 local actionError
@@ -51,8 +52,10 @@ local unlockedAtm = {
 }
 
 noCard = false
-_G.TriggerServerEvent = function(name, requestId, operation, mode)
+local lastOpenLocation
+_G.TriggerServerEvent = function(name, requestId, operation, mode, location)
     if name == 'qbbanking:close' then return end
+    if operation == 'open' then lastOpenLocation = location end
     local result
     if operation == 'atmCard' then
         netEvents['qbbanking:client:response'](requestId, (not noCard) or nil, noCard and 'You need a bank card to use an ATM.' or nil)
@@ -69,7 +72,11 @@ end
 
 _G.exports = {
     kora_target = {
-        addSphereZone = function(_, options) branchOptions = options.options; return 'branch-target' end,
+        addSphereZone = function(_, options)
+            if options.options[1].label == 'Use ATM' then atmZones[#atmZones + 1] = options; return 'atm-zone' end
+            branchOptions = options.options
+            return 'branch-target'
+        end,
         removeZone = function() end,
         addModel = function(_, _, options) atmOptions = options; return 'atm-target' end,
         removeModel = function() end,
@@ -332,3 +339,20 @@ Config.requireBankCard = true
 noCard = false
 Kora.progressbar.start = realStart
 atmOptions[1].onSelect(44)
+
+-- Map-baked ATMs: Config.atmCoords registers one Use ATM zone per coordinate and opens at that coordinate, not at a prop.
+equal(#atmZones, 0, 'no fallback zones are registered while Config.atmCoords is empty')
+Config.atmCoords = { vector3(111.5, 222.5, 33.5), vector3(-44.0, 55.0, 6.0) }
+dofile(root .. 'client.lua')
+equal(#atmZones, 2, 'every Config.atmCoords entry registers an ATM zone')
+equal(atmZones[1].coords.x, 111.5, 'the ATM zone sits on the configured coordinate')
+equal(atmZones[1].radius, Config.atmZoneRadius, 'the ATM zone uses Config.atmZoneRadius')
+atmZones[2].options[1].onSelect()
+equal(lastOpenLocation.x, -44.0, 'a fallback zone opens the ATM at its own coordinate')
+_G.GetClosestObjectOfType = function() return 0 end
+targetExists = false
+atmOptions[1].onSelect()
+equal(notifications[#notifications].message, 'Move closer to an ATM.', 'away from every ATM the player is asked to move closer')
+_G.GetEntityCoords = function() return vector3(111.0, 222.0, 33.0) end
+atmOptions[1].onSelect()
+equal(lastOpenLocation.x, 111.5, 'the event fallback finds a map-baked ATM from Config.atmCoords')

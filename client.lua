@@ -565,6 +565,31 @@ local function nearAtm()
     end
 end
 
+-- Map-baked ATMs are not entities, so Config.atmCoords is the fallback for the closest listed machine within reach.
+local function nearAtmCoords()
+    local coords = GetEntityCoords(PlayerPedId())
+    local radius = Config.atmDistance + (Config.atmTolerance or 1.0)
+    local best, bestDistance
+    for _, atm in ipairs(Config.atmCoords or {}) do
+        local dx, dy, dz = coords.x - atm.x, coords.y - atm.y, coords.z - atm.z
+        local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if distance <= radius and (not bestDistance or distance < bestDistance) then best, bestDistance = atm, distance end
+    end
+    return best
+end
+
+-- Where the ATM is: the fixed zone coordinates, the aimed/nearest ATM entity, or the nearest fallback coordinates.
+local function atmPosition(target, fixed)
+    if fixed then return fixed end
+    local entity = type(target) == 'number' and target ~= 0 and DoesEntityExist(target) and target or nearAtm()
+    if entity then
+        local coords = GetEntityCoords(entity)
+        return { x = coords.x, y = coords.y, z = coords.z }
+    end
+    local atm = nearAtmCoords()
+    return atm and { x = atm.x, y = atm.y, z = atm.z } or nil
+end
+
 -- The access animation must never outlive the attempt, whatever way it ends.
 local function stopAtmAnimation()
     local ped = PlayerPedId()
@@ -573,10 +598,10 @@ local function stopAtmAnimation()
 end
 
 -- target = the entity the player aimed at (kora_target passes it to onSelect); events pass nothing.
-local function accessAtm(target)
+-- fixed = the coordinates of a Config.atmCoords fallback zone.
+local function accessAtm(target, fixed)
     if openingAtm or appOpen then return end
-    local entity = type(target) == 'number' and target ~= 0 and DoesEntityExist(target) and target or nearAtm()
-    if not entity then return notify('Move closer to an ATM.') end
+    if not atmPosition(target, fixed) then return notify('Move closer to an ATM.') end
 
     openingAtm = true
     CreateThread(function()
@@ -605,10 +630,9 @@ local function accessAtm(target)
             if err then notify(err) end
             return
         end
-        if not DoesEntityExist(entity) then entity = nearAtm() end
-        if not entity then return notify('Move closer to an ATM.') end
-        local coords = GetEntityCoords(entity)
-        open('atm', { x = coords.x, y = coords.y, z = coords.z })
+        local position = atmPosition(target, fixed)
+        if not position then return notify('Move closer to an ATM.') end
+        open('atm', position)
     end)
 end
 
@@ -632,10 +656,31 @@ local function registerBranchTargets()
 end
 
 -- ATM props stream in and out with the map, so this must remain a model target.
+-- Config.atmCoords adds sphere zones for ATMs that are baked into the map and never hit as an entity.
 local atmTargetId
+local atmZoneIds = {}
+local function registerAtmZones()
+    for _, zoneId in pairs(atmZoneIds) do pcall(function() exports.kora_target:removeZone(zoneId) end) end
+    atmZoneIds = {}
+    for index, atm in ipairs(Config.atmCoords or {}) do
+        local fixed = { x = atm.x, y = atm.y, z = atm.z }
+        local ok, result = pcall(function()
+            return exports.kora_target:addSphereZone({
+                coords = vector3(atm.x, atm.y, atm.z),
+                radius = Config.atmZoneRadius or 1.2,
+                options = {
+                    { icon = 'credit-card', label = 'Use ATM', distance = Config.atmDistance, onSelect = function() accessAtm(nil, fixed) end },
+                },
+            })
+        end)
+        if ok then atmZoneIds[index] = result else print(('[kora_banking] ATM zone %d registration failed: %s'):format(index, tostring(result))) end
+    end
+end
+
 local function registerAtmTargets()
     if atmTargetId then pcall(function() exports.kora_target:removeModel(Config.atmModels, atmTargetId) end) end
     atmTargetId = nil
+    registerAtmZones()
     local ok, result = pcall(function()
         return exports.kora_target:addModel(Config.atmModels, {
             { icon = 'credit-card', label = 'Use ATM', onSelect = accessAtm },
@@ -656,6 +701,7 @@ AddEventHandler('onClientResourceStart', function(resource)
     if resource ~= 'kora_target' then return end
     -- kora_target restarted: its registry is empty and its ids restart, so stale ids must not be removed (they could hit another resource's targets).
     atmTargetId = nil
+    atmZoneIds = {}
     branchTargetIds = {}
     registerTargets()
 end)

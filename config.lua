@@ -6,6 +6,10 @@ Config = {
     atmModels = { 'prop_atm_01', 'prop_atm_02', 'prop_atm_03', 'prop_fleeca_atm', 'gabz_sm_pb_atmframe',
         -- Wall ATMs inside bank lobbies (Pacific Standard / big bank).
         'v_5_b_atm1', 'v_5_b_atm2' },
+    -- Fallback for ATMs baked into the map (not entities, so model targeting never hits them): each entry is a vector3 at the
+    -- machine and gets a "Use ATM" sphere zone of atmZoneRadius. Leave empty when every ATM resolves through atmModels.
+    atmCoords = {},
+    atmZoneRadius = 1.2,
     atmDistance = 1.8,
     -- Extra metres on top of atmDistance between the player and the ATM (client lookup and server check).
     -- Wall ATMs in bank lobbies are wide, so the prop centre can sit further away than the interaction distance.
@@ -84,6 +88,15 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.atmModels = config.list(Config.atmModels, nil, {
         label = 'ATM models', advanced = true,
         description = 'Model names treated as cash machines by targeting and nearby ATM lookup. Restart qbbanking to apply saved changes.',
+    })
+    Config.atmCoords = config.list(Config.atmCoords, nil, {
+        label = 'ATM fallback coordinates', advanced = true,
+        description = 'World coordinates (X/Y/Z) of ATMs baked into the map that model targeting cannot hit. Each entry gets a Use ATM target zone. Restart kora_banking to apply saved changes.',
+    })
+    Config.atmZoneRadius = config.number(Config.atmZoneRadius, {
+        min = 0.3, max = 5.0, step = 0.1,
+        label = 'ATM fallback zone radius (metres)', advanced = true,
+        description = 'Size of the target zone created at each ATM fallback coordinate. Restart kora_banking to apply saved changes.',
     })
     Config.atmDistance = config.number(Config.atmDistance, {
         min = 0,
