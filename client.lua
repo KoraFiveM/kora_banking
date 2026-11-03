@@ -722,19 +722,27 @@ local function registerAtmTargets()
 end
 
 -- ATMs register first and each registration is isolated: a failing bank-branch zone must never stop ATMs from registering.
+-- targetsRegistered stays true only while the registrations live in the running kora_target, so a start event that arrives
+-- after our own startup registration (client start order is not guaranteed) can not register every option a second time.
+local targetsRegistered = false
 local function registerTargets()
     registerAtmTargets()
     local ok, err = pcall(registerBranchTargets)
     if not ok then print(('[kora_banking] bank branch target registration failed: %s'):format(tostring(err))) end
+    targetsRegistered = ok and atmTargetId ~= nil
 end
 
 registerTargets()
-AddEventHandler('onClientResourceStart', function(resource)
+AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= 'kora_target' then return end
-    -- kora_target restarted: its registry is empty and its ids restart, so stale ids must not be removed (they could hit another resource's targets).
+    -- kora_target stopped: its registry is gone and its ids restart, so stale ids must not be removed (they could hit another resource's targets).
+    targetsRegistered = false
     atmTargetId = nil
     atmZoneIds = {}
     branchTargetIds = {}
+end)
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource ~= 'kora_target' or targetsRegistered then return end
     registerTargets()
 end)
 
