@@ -20,7 +20,7 @@ local env = setmetatable({
         util = { isFiniteNumber = function(n) return type(n) == 'number' and n == n and math.abs(n) < math.huge end,
             cleanText = function(s) return s end },
         callback = { register = function(name, fn) callbacks[name] = fn end },
-        sql = { ready = function() return true end, query = function() return {} end, single = function() return nil end,
+        sql = { ready = function() return true end, ensureTables = function() return { {} } end, query = function() return {} end, single = function() return nil end,
             insert = function() return 1 end, update = function() return 1 end, scalar = function() return 0 end },
     },
     exports = setmetatable({ kora_core = {

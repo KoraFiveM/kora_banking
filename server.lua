@@ -222,7 +222,7 @@ end
 -- Both halves of the UNION select the date as UNIX_TIMESTAMP(...)*1000 so the column type no longer depends on
 -- bank_statements (timestamp) versus bank_operation_legs (datetime) or on how the SQL driver returns dates.
 -- Both sides of the UNION pin the same collation: installs where bank_operation_legs was created
--- with the server default (not banking.sql's utf8mb4_unicode_ci) otherwise fail with "Illegal mix of collations".
+-- with the server default (not the schema's utf8mb4_unicode_ci) otherwise fail with "Illegal mix of collations".
 local COLLATION = 'COLLATE utf8mb4_unicode_ci'
 local STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid, account_name %s AS account_name, amount, reason %s AS reason, statement_type %s AS statement_type, CAST(UNIX_TIMESTAMP(date) * 1000 AS UNSIGNED) AS date'):format(COLLATION, COLLATION, COLLATION, COLLATION)
 local LEG_ID = ("CONCAT('operation:',id) %s"):format(COLLATION)
@@ -857,6 +857,12 @@ CreateThread(function()
     local available, readyErr = Kora.sql.ready(60000)
     if not available then
         print(('^1[qbbanking]^7 database unavailable: %s'):format(readyErr or 'unknown error'))
+        return
+    end
+    -- Idempotent; guarantees bank_accounts/bank_statements exist before the first read (finance.lua ensures the same schema).
+    local ensured, ensureErr = Kora.sql.ensureTables(QBBankingSchema)
+    if not ensured then
+        print(('^1[qbbanking]^7 schema setup failed: %s'):format(ensureErr or 'unknown error'))
         return
     end
     local dateColumn = Kora.sql.single("SHOW COLUMNS FROM bank_statements WHERE Field = 'date'")

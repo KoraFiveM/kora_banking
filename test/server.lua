@@ -6,6 +6,7 @@ local statementResult, updateFails
 local function noop() end
 local env = setmetatable({
     BankingDates = BankingDates,
+    QBBankingSchema = {},
     Kora = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = {
@@ -15,6 +16,7 @@ local env = setmetatable({
         callback = { register = noop },
         sql = {
             ready = function() return true end,
+            ensureTables = function() return { {} } end,
             query = function() return { { account_name = 'police', account_balance = balance, account_type = 'job' } } end,
             single = function(sql)
                 if sql:find('SELECT', 1, true) then
@@ -142,7 +144,13 @@ end
 assert(legSelects == 2, 'both history queries must collate the operation-leg side')
 assert(source:find("STATEMENT_COLUMNS = ('id, citizenid %s AS citizenid", 1, true)
     and source:find('reason %s AS reason, statement_type %s AS statement_type', 1, true), 'statement side must be collated too')
-assert(readFile(root .. 'sql/002_operation_legs_collation.sql'):find('COLLATE=utf8mb4_unicode_ci', 1, true), 'migration must pin bank_operation_legs collation')
+do
+    local schemaEnv = { Kora = { sql = { NULL = {} } } }
+    assert(loadfile(root .. 'server/schema.lua', 't', schemaEnv))()
+    local legs
+    for _, spec in ipairs(schemaEnv.QBBankingSchema) do if spec.name == 'bank_operation_legs' then legs = spec end end
+    assert(legs and legs.collate == 'utf8mb4_unicode_ci', 'schema must pin bank_operation_legs collation')
+end
 assert(readFile(root .. 'server/finance.lua'):find('CONVERT TO CHARACTER SET utf8mb4 COLLATE %s', 1, true), 'guarded conversion must align existing bank_operation_legs')
-assert(readFile(root .. 'server/finance.lua'):find('002_operation_legs_collation.sql', 1, true), 'migration must be registered')
+assert(readFile(root .. 'server/finance.lua'):find('Kora.sql.ensureTables(QBBankingSchema)', 1, true), 'bootstrap must apply the Lua schema')
 print('qbbanking server: statement UNION collation regression passed')

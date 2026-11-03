@@ -34,9 +34,4 @@ client_scripts {
     'client.lua',
 }
 
-server_scripts { 'server.lua', 'server/finance.lua' }
-
-files {
-    'banking.sql',
-    'sql/*.sql',
-}
+server_scripts { 'server/schema.lua', 'server.lua', 'server/finance.lua' }

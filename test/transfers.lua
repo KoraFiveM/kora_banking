@@ -21,7 +21,7 @@ local env = setmetatable({
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = { isFiniteNumber = function(n) return type(n) == 'number' and n == n end, cleanText = function(s) return s end },
         callback = { register = function(name, fn) callbacks[name] = fn end },
-        sql = { ready = function() return true end,
+        sql = { ready = function() return true end, ensureTables = function() return { {} } end,
             query = function(sql, params)
                 if sql:find('inventory LIKE', 1, true) then
                     if params[1]:find(CARD, 1, true) then return { { citizenid = 'CARD33', inventory = 'card' } } end

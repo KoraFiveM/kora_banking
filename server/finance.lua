@@ -235,8 +235,9 @@ end
 
 local LEGS_TABLE, LEGS_COLLATION = 'bank_operation_legs', 'utf8mb4_unicode_ci'
 
--- kora_sql only accepts CREATE TABLE IF NOT EXISTS / ALTER ... ADD IF NOT EXISTS in migration files, so the
--- idempotent collation conversion lives here, guarded by information_schema (runs every boot, no-op once aligned).
+-- Kora.sql.ensureTables never alters existing columns (type/collation differences only come back as warnings),
+-- so converting a pre-existing bank_operation_legs with the wrong collation lives here, guarded by
+-- information_schema (runs every boot, no-op once aligned).
 local function alignLegsCollation()
     local mismatched, err = Kora.sql.scalar([[SELECT
         (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? AND table_collation <> ?)
@@ -253,10 +254,7 @@ end
 local function bootstrap()
     local available = Kora.sql.ready(60000)
     if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
-    local migrated, err = Kora.sql.migrateFiles(GetCurrentResourceName(), {
-        { version = 1, name = 'durable_operations', file = 'sql/001_durable_operations.sql' },
-        { version = 2, name = 'operation_legs_collation', file = 'sql/002_operation_legs_collation.sql' },
-    })
+    local migrated, err = Kora.sql.ensureTables(QBBankingSchema)
     if not migrated then
         print(('[qbbanking] durable banking migration failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
         local retry = tonumber(Config.migrationRetrySeconds) or 0
