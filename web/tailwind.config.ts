@@ -1,4 +1,9 @@
 import type { Config } from "tailwindcss"
+import defaultTheme from "tailwindcss/defaultTheme"
+
+// Follow kora_theme's configurable fonts; the current stacks stay as fallbacks when the variables are unset.
+const sans = defaultTheme.fontFamily.sans.join(", ")
+const mono = ['"SFMono-Regular"', "Consolas", "monospace"].join(", ")
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -16,6 +21,10 @@ export default {
     },
     borderRadius: { sm: ".375rem", md: ".5rem", lg: ".625rem", xl: ".875rem" },
     boxShadow: { floating: "0 12px 32px rgb(0 0 0 / 42%)", modal: "0 24px 64px rgb(0 0 0 / 55%)" },
-    fontFamily: { mono: ['"SFMono-Regular"', "Consolas", "monospace"] }
+    fontFamily: {
+      sans: [`var(--font-sans, ${sans})`],
+      heading: [`var(--font-heading, var(--font-sans, ${sans}))`],
+      mono: [`var(--font-mono, ${mono})`]
+    }
   } }, plugins: []
 } satisfies Config

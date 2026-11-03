@@ -4,6 +4,7 @@
 
 @layer base {
   html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
+  h1, h2, h3 { @apply font-heading; }
 }
 
 @layer components {
