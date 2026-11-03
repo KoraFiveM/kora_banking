@@ -659,7 +659,8 @@ local function accessAtm(target, fixed)
         end
         local ok, completed, err = pcall(Kora.progressbar.start, {
             label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
-            disable = { move = true, combat = true, car = true },
+            -- Config.atmAccessMovement: 'controls' ignores the movement keys, only 'freeze' freezes the ped in place.
+            disable = { move = true, moveMode = Config.atmAccessMovement == 'freeze' and 'freeze' or 'controls', combat = true, car = true },
             -- The clip is bounded by the access time so it can not loop if the bar is never cleaned up.
             anim = { dict = ATM_ANIM.dict, clip = ATM_ANIM.clip, duration = Config.atmAccessTime > 0 and Config.atmAccessTime or nil },
             props = { { model = 'prop_cs_credit_card', bone = 28422, offset = vector3(0.1, 0.03, -0.05), rotation = vector3(0.0, 0.0, 180.0) } },

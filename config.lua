@@ -21,6 +21,11 @@ Config = {
     atmCloseInVehicle = true,
     atmVehicleMessage = 'You cannot use an ATM from a vehicle.',
     atmAccessTime = 1500,
+    -- How the ATM access progress bar (atmAccessTime) stops the player:
+    --   'controls' (default) = walk and sprint keys are ignored for the access time; the ped is never frozen in place,
+    --                          so a walking player slows to a natural stop and a jump or fall carries on (a fall cancels the bar)
+    --   'freeze'             = legacy: the ped is frozen in place (FreezeEntityPosition) for the access time
+    atmAccessMovement = 'controls',
     -- true: an ATM needs a bank card in the inventory and the card PIN. The server checks the card before the animation and progress bar start.
     -- false: no card is needed and the ATM opens without a PIN.
     requireBankCard = true,
@@ -122,6 +127,13 @@ if Kora and Kora.config and Kora.config.adopt then
         min = 0,
         label = 'ATM access time (milliseconds)', advanced = false,
         description = 'Duration of the cancellable progress bar before opening an ATM. 1000 milliseconds equals 1 second. Restart qbbanking to apply saved changes.',
+    })
+    Config.atmAccessMovement = config.enum(Config.atmAccessMovement, {
+        options = {
+            { value = 'controls', label = 'Ignore movement keys' }, { value = 'freeze', label = 'Freeze in place (legacy)' },
+        },
+        label = 'Movement while accessing an ATM', advanced = true,
+        description = 'controls (default) ignores walk and sprint keys during the ATM access bar, so the player slows to a natural stop and never hangs in the air. freeze holds the player in place for the access time. Applies immediately.',
     })
     Config.requireBankCard = config.boolean(Config.requireBankCard, {
         label = 'Require a bank card at ATMs', advanced = false,

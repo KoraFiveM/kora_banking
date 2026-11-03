@@ -313,9 +313,18 @@ local realStart = Kora.progressbar.start
 local noticesBefore, stopsBefore = #notifications, stoppedAnims
 Kora.progressbar.start = function(payload)
     equal(payload.anim.duration, Config.atmAccessTime, 'the ATM clip is bounded by the access time')
+    equal(payload.disable.moveMode, 'controls', 'the ATM bar never freezes the ped in place by default')
     return false
 end
 atmOptions[1].onSelect(44)
+Config.atmAccessMovement = 'freeze'
+Kora.progressbar.start = function(payload)
+    equal(payload.disable.moveMode, 'freeze', 'atmAccessMovement=freeze keeps the legacy freeze')
+    return false
+end
+atmOptions[1].onSelect(44)
+Config.atmAccessMovement = 'controls'
+stopsBefore = stopsBefore + 1
 equal(stoppedAnims, stopsBefore + 1, 'cancelling the ATM bar stops the animation')
 Kora.progressbar.start = function() error('boom') end
 atmOptions[1].onSelect(44)
