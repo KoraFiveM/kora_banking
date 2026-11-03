@@ -92,9 +92,11 @@ _G.Kora = {
         remove = function(blip) removedBlips[#removedBlips + 1] = blip return true end,
     },
     config = { onChange = function(path, handler) configHandlers[path] = handler end },
+    cache = { onChange = function() end, vehicle = function() return false end, coords = function() return vector3(0.0, 0.0, 0.0) end },
     notify = { send = function(payload) notifications[#notifications + 1] = payload end },
     progressbar = { start = function() return true end },
     nui = {
+        closeApp = function() return true end,
         registerApp = function(definition) apps[#apps + 1] = definition end,
         openApp = function()
             local definition = apps[#apps]

@@ -15,6 +15,11 @@ Config = {
     -- Extra metres on top of atmDistance between the player and the ATM (client lookup and server check).
     -- Wall ATMs in bank lobbies are wide, so the prop centre can sit further away than the interaction distance.
     atmTolerance = 1.0,
+    -- The open ATM closes when the player is further than this many metres from the machine (0 = never close on distance).
+    atmCloseDistance = 3.0,
+    -- true: the ATM cannot be opened from a vehicle and an open ATM closes when the player enters one.
+    atmCloseInVehicle = true,
+    atmVehicleMessage = 'You cannot use an ATM from a vehicle.',
     atmAccessTime = 1500,
     -- true: an ATM needs a bank card in the inventory and the card PIN. The server checks the card before the animation and progress bar start.
     -- false: no card is needed and the ATM opens without a PIN.

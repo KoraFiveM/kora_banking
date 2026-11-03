@@ -541,6 +541,37 @@ local function closeSession()
     TriggerServerEvent('qbbanking:close')
 end
 
+-- ATM sessions end when the player drives off or walks away from the machine (Config.atmCloseDistance, 0 disables the distance check).
+local atmSession
+
+local function closeAtmSession()
+    if not atmSession then return end
+    atmSession = nil
+    Kora.nui.closeApp(APP_ID)
+end
+
+local function watchAtmSession(position)
+    local session = { position = position }
+    atmSession = session
+    local maxDistance = tonumber(Config.atmCloseDistance) or 0
+    if maxDistance <= 0 then return end
+    CreateThread(function()
+        while atmSession == session do
+            local coords = Kora.cache.coords()
+            local dx, dy, dz = coords.x - position.x, coords.y - position.y, coords.z - position.z
+            if dx * dx + dy * dy + dz * dz > maxDistance * maxDistance then
+                closeAtmSession()
+                break
+            end
+            Wait(500)
+        end
+    end)
+end
+
+Kora.cache.onChange('vehicle', function(vehicle)
+    if vehicle and Config.atmCloseInVehicle ~= false then closeAtmSession() end
+end)
+
 local function open(mode, location)
     if appOpen then return end
     CreateThread(function()
@@ -549,8 +580,18 @@ local function open(mode, location)
         currentSnapshot = snapshot
         selectedAccount = 'checking'
         appOpen = true
+        if mode == 'atm' and type(location) == 'table' then
+            if Kora.cache.vehicle() and Config.atmCloseInVehicle ~= false then
+                appOpen = false
+                currentSnapshot = nil
+                TriggerServerEvent('qbbanking:close')
+                return notify(Config.atmVehicleMessage or 'You cannot use an ATM from a vehicle.')
+            end
+            watchAtmSession(location)
+        end
         refreshApp()
         local result = Kora.nui.openApp(APP_ID, { viewId = snapshot.locked and 'unlock' or 'accounts' })
+        atmSession = nil
         closeSession()
         if result == nil then notify('The banking interface could not be opened.') end
     end)
@@ -601,6 +642,9 @@ end
 -- fixed = the coordinates of a Config.atmCoords fallback zone.
 local function accessAtm(target, fixed)
     if openingAtm or appOpen then return end
+    if Config.atmCloseInVehicle ~= false and Kora.cache.vehicle() then
+        return notify(Config.atmVehicleMessage or 'You cannot use an ATM from a vehicle.')
+    end
     if not atmPosition(target, fixed) then return notify('Move closer to an ATM.') end
 
     openingAtm = true
