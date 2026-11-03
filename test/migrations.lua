@@ -39,7 +39,7 @@ local function boot(opts)
         if opts.migrateError then return nil, opts.migrateError end
         return { ran = 1 }
     end
-    function sql.scalar(query, params) calls.query, calls.params = query, params; return opts.mismatched, opts.scalarError end
+    function sql.scalar(query, params) calls.query, calls.params = query, params; if calls.scalarAt == nil then calls.scalarAt = calls.ensure or 0 end; return opts.mismatched, opts.scalarError end
     function sql.execute(query) calls.execute[#calls.execute + 1] = query; return nil, opts.alterError end
     local timers = { delays = {} }
     local api = { sql = sql, timers = { setTimeout = function(fn, ms) threads[#threads + 1] = fn; timers.delays[#timers.delays + 1] = ms; return #threads end, clearTimeout = function() end } }
@@ -63,6 +63,7 @@ local calls = boot({ mismatched = 3 })
 check(calls.ensure == 1 and calls.specs[1].name == 'bank_operation_legs', 'bootstrap applies the schema via ensureTables')
 check(#calls.execute == 1 and calls.execute[1]:find('CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', 1, true), 'mismatched collation converts')
 check(calls.ready, 'durable banking enables after conversion')
+check(calls.scalarAt == 0, 'collation is aligned before ensureTables so the handler sees no collation drift')
 calls = boot({ mismatched = '0' })
 check(#calls.execute == 0 and calls.ready, 'already aligned: no ALTER, durable enabled')
 calls = boot({ mismatched = 0 })
@@ -73,8 +74,8 @@ check(calls.ready and printed[1]:find('collation check returned no result', 1, t
 calls, printed = boot({ mismatched = 2, alterError = 'denied' })
 check(calls.ready and printed[1]:find('could not align', 1, true), 'a failed conversion is logged but does not disable durable banking')
 local timers
-calls, printed, timers = boot({ migrateError = 'boom' })
+calls, printed, timers = boot({ mismatched = 0, migrateError = 'boom' })
 check(not calls.ready and printed[1]:find('stay disabled', 1, true) and #timers.delays == 0, 'schema failure is logged clearly; no retry by default')
-calls, printed, timers = boot({ migrateError = 'boom', retry = 120 })
+calls, printed, timers = boot({ mismatched = 0, migrateError = 'boom', retry = 120 })
 check(not calls.ready and timers.delays[1] == 120000, 'migrationRetrySeconds schedules a retry')
 print(('qbbanking migrations: %d assertions passed; Lua schema, guarded collation conversion, failure handling'):format(assertions))

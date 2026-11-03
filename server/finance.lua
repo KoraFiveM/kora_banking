@@ -254,17 +254,17 @@ end
 local function bootstrap()
     local available = Kora.sql.ready(60000)
     if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
+    local aligned, alignErr = alignLegsCollation()
+    if not aligned then
+        -- History queries pin the collation per column, so a failed conversion is not fatal.
+        print(('[qbbanking] could not align %s collation (continuing): %s'):format(LEGS_TABLE, tostring(alignErr)))
+    end
     local migrated, err = Kora.sql.ensureTables(QBBankingSchema)
     if not migrated then
         print(('[qbbanking] durable banking migration failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
         local retry = tonumber(Config.migrationRetrySeconds) or 0
         if retry > 0 then Kora.timers.setTimeout(bootstrap, retry * 1000) end
         return
-    end
-    local aligned, alignErr = alignLegsCollation()
-    if not aligned then
-        -- History queries pin the collation per column, so a failed conversion is not fatal.
-        print(('[qbbanking] could not align %s collation (continuing): %s'):format(LEGS_TABLE, tostring(alignErr)))
     end
     local settled, waitErr = Kora.sql.awaitCheckedOperations('qbcore:fence:qbbanking:')
     if not settled then
