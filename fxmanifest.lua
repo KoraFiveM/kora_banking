@@ -6,7 +6,7 @@ name 'kora_banking'
 -- Keep the legacy resource name resolvable for exports['qbbanking'] callers.
 provide 'qbbanking'
 author 'qbcore2'
-version '3.1.1'
+version '3.1.2'
 description 'Personal, shared, society and gang banking for Kora'
 
 provide 'qb-banking'
