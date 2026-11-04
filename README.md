@@ -110,7 +110,7 @@ require receipt reconciliation or an identical retry. `GetOperation` can return
 Never issue compensating money changes after an ambiguous reply.
 
 Deploy updated kora_sql (including its built bundle), kora_core and kora_banking together.
-Core migration 10 records player-column locks; kora_banking migration 1 adds durable
+Startup creates the player-column lock table (kora_core) and kora_banking's durable
 receipts and a separate ledger supporting 50-character citizen IDs. Existing bank
 exports keep their signatures. The new ledger is included in transaction history.
 Bank startup reconciles its own retained player fences: confirmed receipts publish

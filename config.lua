@@ -203,8 +203,8 @@ if Kora and Kora.config and Kora.config.adopt then
     })
     Config.migrationRetrySeconds = config.integer(Config.migrationRetrySeconds, {
         min = 0, max = 3600,
-        label = 'Retry failed database migration (seconds)', advanced = true,
-        description = 'When the durable banking database migration fails at startup, retry it after this many seconds. 0 keeps the previous behaviour: log the failure once and leave durable banking disabled until the resource restarts. Applies the next time a migration fails.',
+        label = 'Retry failed schema setup (seconds)', advanced = true,
+        description = 'When the durable banking schema setup fails at startup, retry it after this many seconds. 0 keeps the previous behaviour: log the failure once and leave durable banking disabled until the resource restarts. Applies the next time schema setup fails.',
     })
     Config.maxAccounts = config.integer(Config.maxAccounts, {
         min = 0,

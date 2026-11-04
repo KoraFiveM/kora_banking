@@ -865,10 +865,6 @@ CreateThread(function()
         print(('^1[qbbanking]^7 schema setup failed: %s'):format(ensureErr or 'unknown error'))
         return
     end
-    local dateColumn = Kora.sql.single("SHOW COLUMNS FROM bank_statements WHERE Field = 'date'")
-    if dateColumn and type(dateColumn.Extra) == 'string' and dateColumn.Extra:lower():find('on update', 1, true) then
-        Kora.sql.query('ALTER TABLE bank_statements MODIFY date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP')
-    end
     local rows, loadErr = Kora.sql.query('SELECT * FROM bank_accounts')
     if not rows then
         print(('^1[qbbanking]^7 account load failed: %s'):format(loadErr or 'unknown error'))

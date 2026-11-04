@@ -1,4 +1,4 @@
--- Schema regressions and the guarded collation step.
+-- Schema regressions and boot failure handling.
 local assertions = 0
 local function check(value, message) assert(value, message); assertions = assertions + 1 end
 local function readFile(path)
@@ -59,23 +59,13 @@ local function boot(opts)
     return calls, printed, timers
 end
 
-local calls = boot({ mismatched = 3 })
+local calls = boot({})
 check(calls.ensure == 1 and calls.specs[1].name == 'bank_operation_legs', 'bootstrap applies the schema via ensureTables')
-check(#calls.execute == 1 and calls.execute[1]:find('CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', 1, true), 'mismatched collation converts')
-check(calls.ready, 'durable banking enables after conversion')
-check(calls.scalarAt == 0, 'collation is aligned before ensureTables so the handler sees no collation drift')
-calls = boot({ mismatched = '0' })
-check(#calls.execute == 0 and calls.ready, 'already aligned: no ALTER, durable enabled')
-calls = boot({ mismatched = 0 })
-check(calls.params[1] == 'bank_operation_legs' and calls.params[2] == 'utf8mb4_unicode_ci', 'guard checks the legs table and target collation')
-local printed
-calls, printed = boot({ alterError = 'denied' })
-check(calls.ready and printed[1]:find('collation check returned no result', 1, true), 'a failed guard check is logged but does not disable durable banking')
-calls, printed = boot({ mismatched = 2, alterError = 'denied' })
-check(calls.ready and printed[1]:find('could not align', 1, true), 'a failed conversion is logged but does not disable durable banking')
+check(#calls.execute == 0 and calls.scalarAt == nil, 'boot runs no ALTER/CONVERT and no collation probe')
+check(calls.ready, 'durable banking enables once the schema is applied')
 local timers
-calls, printed, timers = boot({ mismatched = 0, migrateError = 'boom' })
+calls, printed, timers = boot({ migrateError = 'boom' })
 check(not calls.ready and printed[1]:find('stay disabled', 1, true) and #timers.delays == 0, 'schema failure is logged clearly; no retry by default')
-calls, printed, timers = boot({ mismatched = 0, migrateError = 'boom', retry = 120 })
+calls, printed, timers = boot({ migrateError = 'boom', retry = 120 })
 check(not calls.ready and timers.delays[1] == 120000, 'migrationRetrySeconds schedules a retry')
-print(('qbbanking migrations: %d assertions passed; Lua schema, guarded collation conversion, failure handling'):format(assertions))
+print(('qbbanking migrations: %d assertions passed; Lua schema, no conversions at boot, failure handling'):format(assertions))

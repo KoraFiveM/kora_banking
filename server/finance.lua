@@ -233,35 +233,12 @@ local function recoverOperations()
     if pending and not recoveryTimer then recoveryTimer = Kora.timers.setTimeout(recoverOperations, 30000) end
 end
 
-local LEGS_TABLE, LEGS_COLLATION = 'bank_operation_legs', 'utf8mb4_unicode_ci'
-
--- Kora.sql.ensureTables never alters existing columns (type/collation differences only come back as warnings),
--- so converting a pre-existing bank_operation_legs with the wrong collation lives here, guarded by
--- information_schema (runs every boot, no-op once aligned).
-local function alignLegsCollation()
-    local mismatched, err = Kora.sql.scalar([[SELECT
-        (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? AND table_collation <> ?)
-        + (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND collation_name IS NOT NULL AND collation_name <> ?)]],
-        { LEGS_TABLE, LEGS_COLLATION, LEGS_TABLE, LEGS_COLLATION })
-    if mismatched == nil then return false, err or 'collation check returned no result' end
-    if (tonumber(mismatched) or 0) == 0 then return true end
-    local _, alterErr = Kora.sql.execute(('ALTER TABLE `%s` CONVERT TO CHARACTER SET utf8mb4 COLLATE %s'):format(LEGS_TABLE, LEGS_COLLATION))
-    if alterErr then return false, alterErr end
-    print(('[qbbanking] converted %s to %s'):format(LEGS_TABLE, LEGS_COLLATION))
-    return true
-end
-
 local function bootstrap()
     local available = Kora.sql.ready(60000)
     if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
-    local aligned, alignErr = alignLegsCollation()
-    if not aligned then
-        -- History queries pin the collation per column, so a failed conversion is not fatal.
-        print(('[qbbanking] could not align %s collation (continuing): %s'):format(LEGS_TABLE, tostring(alignErr)))
-    end
     local migrated, err = Kora.sql.ensureTables(QBBankingSchema)
     if not migrated then
-        print(('[qbbanking] durable banking migration failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
+        print(('[qbbanking] durable banking schema setup failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
         local retry = tonumber(Config.migrationRetrySeconds) or 0
         if retry > 0 then Kora.timers.setTimeout(bootstrap, retry * 1000) end
         return

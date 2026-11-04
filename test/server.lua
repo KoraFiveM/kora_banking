@@ -151,6 +151,6 @@ do
     for _, spec in ipairs(schemaEnv.QBBankingSchema) do if spec.name == 'bank_operation_legs' then legs = spec end end
     assert(legs and legs.collate == 'utf8mb4_unicode_ci', 'schema must pin bank_operation_legs collation')
 end
-assert(readFile(root .. 'server/finance.lua'):find('CONVERT TO CHARACTER SET utf8mb4 COLLATE %s', 1, true), 'guarded conversion must align existing bank_operation_legs')
+assert(not readFile(root .. 'server/finance.lua'):find('CONVERT TO CHARACTER SET', 1, true), 'boot must not convert existing tables')
 assert(readFile(root .. 'server/finance.lua'):find('Kora.sql.ensureTables(QBBankingSchema)', 1, true), 'bootstrap must apply the Lua schema')
 print('qbbanking server: statement UNION collation regression passed')
