@@ -610,13 +610,10 @@ end
 local function nearAtmCoords()
     local coords = GetEntityCoords(PlayerPedId())
     local radius = Config.atmDistance + (Config.atmTolerance or 1.0)
-    local best, bestDistance
-    for _, atm in ipairs(Config.atmCoords or {}) do
-        local dx, dy, dz = coords.x - atm.x, coords.y - atm.y, coords.z - atm.z
-        local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if distance <= radius and (not bestDistance or distance < bestDistance) then best, bestDistance = atm, distance end
-    end
-    return best
+    return Kora.util.nearest(Config.atmCoords or {}, coords, {
+        radius = radius,
+        coordsOf = function(atm) return atm end,
+    })
 end
 
 -- Where the ATM is: the fixed zone coordinates, the aimed/nearest ATM entity, or the nearest fallback coordinates.

@@ -25,8 +25,8 @@ local function canonical(value, depth)
 end
 
 local function decode(value)
-    local ok, result = pcall(json.decode, value or '')
-    return ok and type(result) == 'table' and result or nil
+    local result = Kora.util.decodeJson(value or '')
+    return type(result) == 'table' and result or nil
 end
 
 local function playerValues(ids)

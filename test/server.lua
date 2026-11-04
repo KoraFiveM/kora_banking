@@ -12,6 +12,21 @@ local env = setmetatable({
         util = {
             isFiniteNumber = function(n) return type(n) == 'number' and n == n and math.abs(n) < math.huge end,
             cleanText = function(s) return s end,
+            isInteger = function(n) return type(n) == 'number' and n == n and n % 1 == 0 end,
+            decodeJson = function(value) return type(value) == 'string' and {} or nil, 'invalid_json' end,
+            rateLimiter = function(max, window)
+                local buckets = {}
+                local limiter = {}
+                function limiter:consume(key, now)
+                    local retained = {}
+                    for _, t in ipairs(buckets[key] or {}) do if now - t < window then retained[#retained + 1] = t end end
+                    if #retained >= max then buckets[key] = retained; return false end
+                    retained[#retained + 1] = now
+                    buckets[key] = retained
+                    return true
+                end
+                return limiter
+            end,
         },
         callback = { register = noop },
         sql = {

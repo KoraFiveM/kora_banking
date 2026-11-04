@@ -1,6 +1,5 @@
 local Accounts = {}
 local Sessions = {}
-local MemberRequests = {}
 local ready = false
 local durableHistory = false
 AddEventHandler('qbbanking:durableReady', function() durableHistory = true end)
@@ -29,6 +28,11 @@ local function roundAmount(value)
     return amount
 end
 
+-- Kora.sql.update returns the affected row count, or false/nil on failure -- this is "did it actually change anything".
+local function applied(changed)
+    return type(changed) == 'number' and changed >= 1
+end
+
 local MIN_LABELS = { withdraw = 'withdrawal', deposit = 'deposit', transfer = 'transfer' }
 
 -- Read at use time so live config changes apply immediately; anything invalid falls back to 1.
@@ -50,6 +54,13 @@ local function cleanText(value, fallback, maxLength)
     }) or fallback
 end
 
+local function validAccountName(raw)
+    local name = cleanText(raw, nil, 40)
+    if not name or #name < 3 then return nil, 'Account names need at least 3 characters.' end
+    if not name:match('^[%w][%w _%-]+$') then return nil, 'Use letters, numbers, spaces, dashes or underscores.' end
+    return name
+end
+
 local function player(src)
     local data = exports.kora_core:getPlayerData(src)
     if not data then return nil, 'Player data is unavailable.' end
@@ -63,8 +74,7 @@ end
 local function boundedUsers(value)
     if type(value) == 'string' then
         if #value > Config.maxSharedMemberBytes then return {} end
-        local ok, decoded = pcall(json.decode, value)
-        value = ok and decoded or nil
+        value = Kora.util.decodeJson(value)
     end
     if type(value) ~= 'table' then return {} end
 
@@ -83,22 +93,15 @@ local function users(account)
     return boundedUsers(account.users)
 end
 
+-- Config.memberRateLimit requires a restart to change (see config.lua), so building the limiter once on first
+-- use -- rather than at module load, before Config is necessarily populated -- is safe.
+local memberRequestLimiter
+
 local function consumeMemberRequest(src)
-    local limit = Config.memberRateLimit
-    local current = GetGameTimer()
-    local cutoff = current - limit.window
-    local bucket = MemberRequests[src] or {}
-    local retained = {}
-    for i = 1, #bucket do
-        if bucket[i] > cutoff then retained[#retained + 1] = bucket[i] end
+    if not memberRequestLimiter then
+        memberRequestLimiter = Kora.util.rateLimiter(Config.memberRateLimit.max, Config.memberRateLimit.window)
     end
-    if #retained >= limit.max then
-        MemberRequests[src] = retained
-        return false
-    end
-    retained[#retained + 1] = current
-    MemberRequests[src] = retained
-    return true
+    return memberRequestLimiter:consume(src, GetGameTimer())
 end
 
 local function isMember(account, citizenid)
@@ -184,10 +187,12 @@ local function adjustAccount(name, delta)
     else
         changed = Kora.sql.update('UPDATE bank_accounts SET account_balance = account_balance + ? WHERE account_name = ?', { delta, name })
     end
-    if not changed or changed < 1 then return false end
+    if not applied(changed) then return false end
     refreshAccount(name)
     return true
 end
+
+local ACCOUNT_TYPE_PRIORITY = { checking = 1, job = 2, gang = 3, shared = 4 }
 
 local function accountRows(data, mode)
     local rows = {
@@ -212,8 +217,7 @@ local function accountRows(data, mode)
         end
     end
     table.sort(rows, function(a, b)
-        local priority = { checking = 1, job = 2, gang = 3, shared = 4 }
-        local left, right = priority[a.type] or 9, priority[b.type] or 9
+        local left, right = ACCOUNT_TYPE_PRIORITY[a.type] or 9, ACCOUNT_TYPE_PRIORITY[b.type] or 9
         return left == right and a.owner < b.owner or left < right
     end)
     return rows
@@ -472,8 +476,8 @@ local function resolveRecipient(ref, settings)
     if settings.allowCardNumbers and ref:match('^%d+$') and #ref >= 12 and #ref <= 19 then
         local rows = Kora.sql.query('SELECT citizenid, inventory FROM players WHERE deleted_at IS NULL AND inventory LIKE ?', { '%"cardNumber":"' .. ref .. '"%' }) or {}
         for _, row in ipairs(rows) do
-            local ok, inventory = pcall(json.decode, row.inventory or '')
-            local issuer = ok and findCardIssuer(inventory, ref, 0) or nil
+            local inventory, decodeErr = Kora.util.decodeJson(row.inventory or '')
+            local issuer = not decodeErr and findCardIssuer(inventory, ref, 0) or nil
             found = issuer and character(issuer) or nil
             if found then return found end
         end
@@ -487,7 +491,18 @@ local function creditOffline(citizenid, amount)
           WHERE citizenid = ? AND deleted_at IS NULL AND COALESCE(JSON_EXTRACT(money, '$.bank'), 0) + ? <= 9007199254740991]],
         { amount, citizenid, amount }
     )
-    return changed ~= nil and changed ~= false and changed >= 1
+    return applied(changed)
+end
+
+-- Debits `from`, then runs `creditDestination`; a failure at either step rolls the debit back.
+-- Shared by every transfer() branch below -- only how the destination is credited differs.
+local function moveFunds(src, data, from, amount, reason, creditDestination, creditFailureMessage)
+    if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
+    if not creditDestination() then
+        credit(src, from, amount, 'transfer rollback')
+        return nil, creditFailureMessage
+    end
+    return true
 end
 
 local function transfer(src, data, payload, branch)
@@ -510,11 +525,10 @@ local function transfer(src, data, payload, branch)
         local destination = sourceAccount(data, payload.to)
         if not destination then return nil, 'You cannot use the destination account.' end
         if destination.account_name == from.account_name then return nil, 'Choose two different accounts.' end
-        if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
-        if not credit(src, destination, amount, reason) then
-            credit(src, from, amount, 'transfer rollback')
-            return nil, 'The destination account could not be credited.'
-        end
+        local ok, err = moveFunds(src, data, from, amount, reason,
+            function() return credit(src, destination, amount, reason) end,
+            'The destination account could not be credited.')
+        if not ok then return nil, err end
         statement(src, from.account_name, amount, reason, 'withdraw')
         statement(src, destination.account_name, amount, reason, 'deposit')
         return ('Transferred $%s.'):format(amount)
@@ -532,11 +546,10 @@ local function transfer(src, data, payload, branch)
     if target.kind == 'account' then
         local name = target.account.account_name
         if name == from.account_name then return nil, 'Choose two different accounts.' end
-        if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
-        if not credit(src, target.account, amount, reason) then
-            credit(src, from, amount, 'transfer rollback')
-            return nil, 'The recipient could not be credited.'
-        end
+        local ok, err = moveFunds(src, data, from, amount, reason,
+            function() return credit(src, target.account, amount, reason) end,
+            'The recipient could not be credited.')
+        if not ok then return nil, err end
         statement(src, from.account_name, amount, reason, 'withdraw')
         statement(src, name, amount, reason, 'deposit')
         return ('Sent $%s.'):format(amount)
@@ -548,14 +561,13 @@ local function transfer(src, data, payload, branch)
     local online = target.source and target or exports.kora_core:getPlayerByCitizenId(citizenid)
     local recipientSource = online and online.source or nil
     if not recipientSource and not settings.allowOffline then return nil, 'That account holder must be online.' end
-    if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
-    local credited
-    if recipientSource then credited = exports.kora_core:addMoney(recipientSource, 'bank', amount, reason, true)
-    else credited = creditOffline(citizenid, amount) end
-    if not credited then
-        credit(src, from, amount, 'transfer rollback')
-        return nil, 'The recipient could not be credited.'
-    end
+    local ok, err = moveFunds(src, data, from, amount, reason,
+        function()
+            if recipientSource then return exports.kora_core:addMoney(recipientSource, 'bank', amount, reason, true) end
+            return creditOffline(citizenid, amount)
+        end,
+        'The recipient could not be credited.')
+    if not ok then return nil, err end
     statement(src, from.account_name, amount, reason, 'withdraw')
     statement(recipientSource, 'checking', amount, reason, 'deposit', citizenid)
     return ('Sent $%s.'):format(amount)
@@ -589,11 +601,10 @@ local function manage(src, data, payload, branch)
     end
 
     if payload.kind == 'create' then
-        local name = cleanText(payload.name, nil, 40)
         if tonumber(payload.amount) == 0 then return nil, 'You can not open a shared account with $0' end
         local amount = roundAmount(payload.amount)
-        if not name or #name < 3 then return nil, 'Account names need at least 3 characters.' end
-        if not name:match('^[%w][%w _%-]+$') then return nil, 'Use letters, numbers, spaces, dashes or underscores.' end
+        local name, nameErr = validAccountName(payload.name)
+        if not name then return nil, nameErr end
         if not amount then return nil, 'Enter an opening balance.' end
         local count = 0
         for _, account in pairs(Accounts) do if account.citizenid == data.citizenid then count = count + 1 end end
@@ -615,11 +626,11 @@ local function manage(src, data, payload, branch)
         return nil, 'Only the account owner can make that change.'
     end
     if payload.kind == 'rename' then
-        local name = cleanText(payload.name, nil, 40)
-        if not name or #name < 3 or not name:match('^[%w][%w _%-]+$') then return nil, 'Enter a valid account name.' end
+        local name = validAccountName(payload.name)
+        if not name then return nil, 'Enter a valid account name.' end
         if Accounts[name] then return nil, 'That account name is already in use.' end
         local changed = Kora.sql.update('UPDATE bank_accounts SET account_name = ? WHERE account_name = ? AND citizenid = ?', { name, account.account_name, data.citizenid })
-        if not changed or changed < 1 then return nil, 'The account could not be renamed.' end
+        if not applied(changed) then return nil, 'The account could not be renamed.' end
         Kora.sql.update('UPDATE bank_statements SET account_name = ? WHERE account_name = ?', { name, account.account_name })
         Accounts[account.account_name] = nil
         refreshAccount(name)
@@ -627,7 +638,7 @@ local function manage(src, data, payload, branch)
     elseif payload.kind == 'delete' then
         if tonumber(account.account_balance) ~= 0 then return nil, 'Move the remaining balance before closing this account.' end
         local changed = Kora.sql.update('DELETE FROM bank_accounts WHERE account_name = ? AND citizenid = ?', { account.account_name, data.citizenid })
-        if not changed or changed < 1 then return nil, 'The account could not be closed.' end
+        if not applied(changed) then return nil, 'The account could not be closed.' end
         Accounts[account.account_name] = nil
         return 'Shared account closed.'
     elseif payload.kind == 'addMember' or payload.kind == 'removeMember' then
@@ -654,7 +665,7 @@ local function manage(src, data, payload, branch)
         local encoded = json.encode(list)
         if #encoded > Config.maxSharedMemberBytes then return nil, 'The account access list is too large.' end
         local changed = Kora.sql.update('UPDATE bank_accounts SET users = ? WHERE account_name = ? AND citizenid = ?', { encoded, account.account_name, data.citizenid })
-        if not changed or changed < 1 then return nil, 'Account access could not be updated.' end
+        if not applied(changed) then return nil, 'Account access could not be updated.' end
         account.users = encoded
         return payload.kind == 'addMember' and 'Account access granted.' or 'Account access removed.'
     end
@@ -850,7 +861,6 @@ end)
 RegisterNetEvent('qbbanking:close', function() Sessions[source] = nil end)
 AddEventHandler('playerDropped', function()
     Sessions[source] = nil
-    MemberRequests[source] = nil
 end)
 
 CreateThread(function()

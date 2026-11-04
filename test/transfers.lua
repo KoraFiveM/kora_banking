@@ -19,7 +19,40 @@ local env = setmetatable({
         locations = { { coords = pos } }, Transfers = { allowOffline = true, allowSharedAccounts = true, allowCardNumbers = true } },
     Kora = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
-        util = { isFiniteNumber = function(n) return type(n) == 'number' and n == n end, cleanText = function(s) return s end },
+        util = { isFiniteNumber = function(n) return type(n) == 'number' and n == n end, cleanText = function(s) return s end,
+            isInteger = function(n) return type(n) == 'number' and n == n and n % 1 == 0 end,
+            -- Mirrors this env's own json.decode mock below (same CARD-tagged fixture), since this
+            -- closure's lexical environment is the real _G, not the sandboxed env server.lua runs in.
+            decodeJson = function(value)
+                if type(value) ~= 'string' then return nil, 'invalid_json' end
+                if value == 'card' then return { { name = 'bank_card', info = { cardNumber = CARD, citizenid = 'CARD33' } } } end
+                return {}
+            end,
+            nearest = function(list, position, opts)
+                local best, bestDistance
+                for _, entry in pairs(list) do
+                    local coords = opts.coordsOf(entry)
+                    local dx, dy, dz = (position.x or 0) - (coords.x or 0), (position.y or 0) - (coords.y or 0), (position.z or 0) - (coords.z or 0)
+                    local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                    if (opts.radius == nil or distance <= opts.radius) and (bestDistance == nil or distance < bestDistance) then
+                        best, bestDistance = entry, distance
+                    end
+                end
+                return best, bestDistance
+            end,
+            rateLimiter = function(max, window)
+                local buckets = {}
+                local limiter = {}
+                function limiter:consume(key, now)
+                    local retained = {}
+                    for _, t in ipairs(buckets[key] or {}) do if now - t < window then retained[#retained + 1] = t end end
+                    if #retained >= max then buckets[key] = retained; return false end
+                    retained[#retained + 1] = now
+                    buckets[key] = retained
+                    return true
+                end
+                return limiter
+            end },
         callback = { register = function(name, fn) callbacks[name] = fn end },
         sql = { ready = function() return true end, ensureTables = function() return { {} } end,
             query = function(sql, params)

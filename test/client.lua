@@ -84,6 +84,20 @@ _G.exports = {
 }
 
 _G.Kora = {
+    util = {
+        nearest = function(list, position, opts)
+            local best, bestDistance
+            for _, entry in pairs(list) do
+                local coords = opts.coordsOf(entry)
+                local dx, dy, dz = (position.x or 0) - (coords.x or 0), (position.y or 0) - (coords.y or 0), (position.z or 0) - (coords.z or 0)
+                local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if (opts.radius == nil or distance <= opts.radius) and (bestDistance == nil or distance < bestDistance) then
+                    best, bestDistance = entry, distance
+                end
+            end
+            return best, bestDistance
+        end,
+    },
     blips = {
         create = function(coords, options)
             createdBlips[#createdBlips + 1] = { coords = coords, options = options }

@@ -15,6 +15,14 @@ local function tierList()
     return type(list) == 'table' and list or {}
 end
 
+-- Tier names sorted alphabetically, so "the first tier that qualifies" is deterministic.
+local function sortedTierNames()
+    local names = {}
+    for name in pairs(tierList()) do names[#names + 1] = tostring(name) end
+    table.sort(names)
+    return names
+end
+
 function BankingTiers.enabled()
     return settings().enabled == true
 end
@@ -74,18 +82,21 @@ function BankingTiers.resolve(position, range)
     if type(position) ~= 'table' and type(position) ~= 'vector3' and type(position) ~= 'vector4' then return nil end
     local px, py, pz = tonumber(position.x), tonumber(position.y), tonumber(position.z)
     if not px or not py or not pz then return nil end
-    local best, bestDistance
+    local candidates = {}
     for index, raw in ipairs(type(Config) == 'table' and Config.locations or {}) do
         local entry = BankingTiers.entry(raw)
         local c = entry and entry.coords
         local cx, cy, cz = c and tonumber(c.x), c and tonumber(c.y), c and tonumber(c.z)
         if cx and cy and cz then
-            local dx, dy, dz = px - cx, py - cy, pz - cz
-            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-            if distance <= range and (not bestDistance or distance < bestDistance) then best, bestDistance = index, distance end
+            candidates[#candidates + 1] = { index = index, coords = { x = cx, y = cy, z = cz } }
         end
     end
-    return best and BankingTiers.info(best) or nil
+
+    local nearest = Kora.util.nearest(candidates, { x = px, y = py, z = pz }, {
+        radius = range,
+        coordsOf = function(candidate) return candidate.coords end,
+    })
+    return nearest and BankingTiers.info(nearest.index) or nil
 end
 
 -- A feature is allowed unless tiers are enabled and the location's tier explicitly sets it to false.
@@ -104,10 +115,7 @@ end
 
 -- Label of the first tier (sorted by name) that allows the feature, for "Available at ..." messages.
 function BankingTiers.availableAt(feature)
-    local names = {}
-    for name in pairs(tierList()) do names[#names + 1] = tostring(name) end
-    table.sort(names)
-    for _, name in ipairs(names) do
+    for _, name in ipairs(sortedTierNames()) do
         local tier = BankingTiers.get(name)
         if tier and tier.features[feature] ~= false then return tier.label end
     end
@@ -125,10 +133,7 @@ end
 
 -- Label of the first tier (sorted by name) whose limit for key is higher than `current` (or unlimited).
 function BankingTiers.higherLimitAt(key, current)
-    local names = {}
-    for name in pairs(tierList()) do names[#names + 1] = tostring(name) end
-    table.sort(names)
-    for _, name in ipairs(names) do
+    for _, name in ipairs(sortedTierNames()) do
         local tier = BankingTiers.get(name)
         local value = tier and tonumber(tier.limits[key])
         if tier and (not value or value <= 0 or value > current) then return tier.label end
