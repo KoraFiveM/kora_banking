@@ -199,6 +199,14 @@ local function appDefinition()
         }
     end
 
+    -- A max below the min (e.g. the daily limit is used up) makes kora_lib reject the whole app update.
+    local atmWithdrawMax
+    if snapshot.mode == 'atm' and selected then
+        local available = tonumber(selected.balance) or 0
+        if atmDailyRemaining ~= nil then available = math.min(available, atmDailyRemaining) end
+        if available >= minWithdraw then atmWithdrawMax = available end
+    end
+
     local cashActions = {
         {
             id = 'banking:withdraw', label = 'Withdraw cash', icon = 'dollar-sign', variant = 'primary',
@@ -207,8 +215,7 @@ local function appDefinition()
             fields = {
                 { id = 'account', label = 'From account', type = 'select', options = accountSelect, default = selected and selected.name or 'checking', required = true },
                 { id = 'amount', label = 'Amount', type = 'number', min = minWithdraw,
-                    max = snapshot.mode == 'atm' and selected and (tonumber(selected.balance) or 0) >= minWithdraw
-                        and (atmDailyRemaining == nil and selected.balance or math.min(tonumber(selected.balance), atmDailyRemaining)) or nil,
+                    max = atmWithdrawMax,
                     required = true, placeholder = '0', presets = amountPresets(),
                     description = snapshot.mode == 'atm' and selected and (money(selected.balance) .. ' available in this account')
                         or 'Each account option shows its current available balance.' .. (minWithdraw > 1 and (' Minimum withdrawal: ' .. money(minWithdraw) .. '.') or '') },

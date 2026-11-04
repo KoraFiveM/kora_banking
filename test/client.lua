@@ -229,6 +229,11 @@ local refreshedAtmWithLimit = locked.onAction('banking:unlock', { value = { pin 
 local limitedWithdraw = tab(view({ navigation = refreshedAtmWithLimit.update.navigation }, 'cash'), 'withdraw').content.actions[1]
 equal(limitedWithdraw.fields[2].max, 3000, 'ATM withdrawal maximum uses the remaining global limit')
 unlockedAtm.accounts[1].balance = 2400
+unlockedAtm.limits.daily = 0
+local exhaustedAtm = locked.onAction('banking:unlock', { value = { pin = '1234' } })
+local exhaustedWithdraw = tab(view({ navigation = exhaustedAtm.update.navigation }, 'cash'), 'withdraw').content.actions[1]
+equal(exhaustedWithdraw.fields[2].max, nil, 'an exhausted daily limit never produces a max below the min')
+equal(exhaustedWithdraw.disabled, true, 'an exhausted daily limit disables ATM withdrawals')
 unlockedAtm.limits.daily = 5000
 
 actionError = 'Above the limit of what you may withdraw at this ATM.'
