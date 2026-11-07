@@ -23,7 +23,6 @@ dependency 'kora_inventory'
 
 shared_scripts {
     '@kora_lib/init.lua',
-    '@kora_sql/init.lua',
     '@kora_core/init.lua',
     'config.lua',
     'dates.lua',
@@ -34,4 +33,4 @@ client_scripts {
     'client.lua',
 }
 
-server_scripts { 'server/schema.lua', 'server.lua', 'server/finance.lua' }
+server_scripts { '@kora_sql/init.lua', 'server/schema.lua', 'server.lua', 'server/finance.lua' }
