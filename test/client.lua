@@ -18,7 +18,9 @@ _G.CreateThread = function(handler) handler() end
 _G.SetTimeout = function() end
 _G.RegisterCommand = function() end
 _G.PlayerPedId = function() return 1 end
+local pedPos = vector3(10, 20, 30)
 _G.GetEntityCoords = function(entity)
+    if entity == 1 then return pedPos end
     if entity == 44 then return vector3(10, 20, 30) end
     return vector3(0, 0, 0)
 end
@@ -52,13 +54,22 @@ local unlockedAtm = {
 }
 
 noCard = false
+local serverFar = false -- makes the server refuse the ATM location, as nearAtm does for a far position
 local lastOpenLocation
 _G.TriggerServerEvent = function(name, requestId, operation, mode, location)
     if name == 'qbbanking:close' then return end
     if operation == 'open' then lastOpenLocation = location end
     local result
     if operation == 'atmCard' then
-        netEvents['qbbanking:client:response'](requestId, (not noCard) or nil, noCard and 'You need a bank card to use an ATM.' or nil)
+        -- Mirrors server atmCardCallback: the card check honours requireBankCard, then the location check.
+        local hasCard = (not noCard) or Config.requireBankCard == false
+        if not hasCard then
+            netEvents['qbbanking:client:response'](requestId, nil, 'You need a bank card to use an ATM.')
+        elseif serverFar then
+            netEvents['qbbanking:client:response'](requestId, nil, 'Move closer to an ATM.')
+        else
+            netEvents['qbbanking:client:response'](requestId, true, nil)
+        end
         return
     end
     if operation == 'open' then result = mode == 'atm' and lockedAtm or bankSnapshot
@@ -379,10 +390,12 @@ dofile(root .. 'client.lua')
 equal(#atmZones, 2, 'every Config.atmCoords entry registers an ATM zone')
 equal(atmZones[1].coords.x, 111.5, 'the ATM zone sits on the configured coordinate')
 equal(atmZones[1].radius, Config.atmZoneRadius, 'the ATM zone uses Config.atmZoneRadius')
+pedPos = vector3(-44.0, 55.0, 6.0)
 atmZones[2].options[1].onSelect()
 equal(lastOpenLocation.x, -44.0, 'a fallback zone opens the ATM at its own coordinate')
 _G.GetClosestObjectOfType = function() return 0 end
 targetExists = false
+pedPos = vector3(10, 20, 30)
 atmOptions[1].onSelect()
 equal(notifications[#notifications].message, 'Move closer to an ATM.', 'away from every ATM the player is asked to move closer')
 _G.GetEntityCoords = function() return vector3(111.0, 222.0, 33.0) end
@@ -417,3 +430,56 @@ noCard = true
 equal(atmOptions[1].canInteract(), true, 'the target always shows when cards are not required')
 Config.requireBankCard = true
 Config.atmAlwaysShowTarget = true
+
+-- Early refusal: the client and the server agree on reach before the animation starts.
+-- Isolated from the map-baked fallbacks above.
+Config.atmCoords = {}
+noCard = false
+_G.GetEntityCoords = function(entity)
+    if entity == 1 then return pedPos end
+    if entity == 44 then return vector3(10, 20, 30) end
+    return vector3(0, 0, 0)
+end
+_G.GetClosestObjectOfType = function() return 44 end
+targetExists = true
+local function barRuns(fn)
+    local runs = 0
+    Kora.progressbar.start = function() runs = runs + 1 return true end
+    fn()
+    Kora.progressbar.start = realStart
+    return runs
+end
+
+-- A wide prop returned by the native but out of reach: no progress bar, one immediate notification.
+pedPos = vector3(100.0, 100.0, 30.0)
+local noticesFar = #notifications
+equal(barRuns(function() atmOptions[1].onSelect(44) end), 0, 'a far ATM prop starts no progress bar or animation')
+equal(notifications[#notifications].message, 'Move closer to an ATM.', 'a far ATM prop says to move closer straight away')
+equal(#notifications, noticesFar + 1, 'a far ATM prop notifies exactly once')
+
+-- Server reach refusal before the animation: no bar, one notification.
+pedPos = vector3(10, 20, 30)
+serverFar = true
+local noticesServer = #notifications
+equal(barRuns(function() atmOptions[1].onSelect(44) end), 0, 'a server location refusal starts no progress bar or animation')
+equal(notifications[#notifications].message, 'Move closer to an ATM.', 'a server location refusal says to move closer')
+equal(#notifications, noticesServer + 1, 'a server location refusal notifies exactly once')
+serverFar = false
+
+-- A valid ATM in reach still reaches the progress bar and opens at its position.
+local runsValid = barRuns(function() atmOptions[1].onSelect(44) end)
+equal(runsValid, 1, 'a valid ATM in reach still starts the progress bar')
+equal(lastOpenLocation.x, 10, 'a valid ATM in reach opens at the ATM position')
+
+-- requireBankCard=false: the server still checks reach, so a far position is refused before the bar.
+Config.requireBankCard = false
+pedPos = vector3(100.0, 100.0, 30.0)
+equal(barRuns(function() atmOptions[1].onSelect(44) end), 0, 'requireBankCard=false still refuses a far ATM before the bar')
+equal(notifications[#notifications].message, 'Move closer to an ATM.', 'requireBankCard=false far ATM says to move closer')
+pedPos = vector3(10, 20, 30)
+equal(barRuns(function() atmOptions[1].onSelect(44) end), 1, 'requireBankCard=false in reach still starts the bar')
+Config.requireBankCard = true
+Kora.progressbar.start = realStart
+Config.atmCoords = nil
+_G.GetClosestObjectOfType = function() return 44 end
+print(('qbbanking client: ATM reach checks passed (%d assertions total)'):format(passed))

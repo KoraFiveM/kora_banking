@@ -695,8 +695,10 @@ local function openCallback(src, mode, location)
 end
 
 -- Quick pre-check so the client can refuse before the animation and progress bar; openBanking stays the authority.
-local function atmCardCallback(src)
+-- location is optional: the target visibility check asks for the card only, without a position.
+local function atmCardCallback(src, location)
     if atmCardMissing(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
+    if location ~= nil and not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
     return true
 end
 

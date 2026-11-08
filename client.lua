@@ -604,13 +604,32 @@ local function open(mode, location)
     end)
 end
 
+-- Same reach as the server's nearAtm: centre-to-ped distance within atmDistance + atmTolerance.
+local function distanceSquared(point)
+    local ped = GetEntityCoords(PlayerPedId())
+    local dx, dy, dz = ped.x - point.x, ped.y - point.y, ped.z - point.z
+    return dx * dx + dy * dy + dz * dz
+end
+
+local function inAtmReach(point)
+    local limit = Config.atmDistance + (Config.atmTolerance or 1.0)
+    return distanceSquared(point) <= limit * limit
+end
+
 local function nearAtm()
     local coords = GetEntityCoords(PlayerPedId())
     local radius = Config.atmDistance + (Config.atmTolerance or 1.0)
+    local best, bestDistance
     for _, modelName in ipairs(Config.atmModels) do
         local entity = GetClosestObjectOfType(coords.x, coords.y, coords.z, radius, joaat(modelName), false, false, false)
-        if entity ~= 0 then return entity end
+        if entity ~= 0 then
+            -- Wide props can be returned although their origin is out of reach, so only the nearest in-reach one counts.
+            local point = GetEntityCoords(entity)
+            local d = distanceSquared(point)
+            if inAtmReach(point) and (not bestDistance or d < bestDistance) then best, bestDistance = entity, d end
+        end
     end
+    return best
 end
 
 -- Map-baked ATMs are not entities, so Config.atmCoords is the fallback for the closest listed machine within reach.
@@ -625,14 +644,15 @@ end
 
 -- Where the ATM is: the fixed zone coordinates, the aimed/nearest ATM entity, or the nearest fallback coordinates.
 local function atmPosition(target, fixed)
-    if fixed then return fixed end
+    if fixed then return inAtmReach(fixed) and fixed or nil end
     local entity = type(target) == 'number' and target ~= 0 and DoesEntityExist(target) and target or nearAtm()
     if entity then
         local coords = GetEntityCoords(entity)
-        return { x = coords.x, y = coords.y, z = coords.z }
+        if inAtmReach(coords) then return { x = coords.x, y = coords.y, z = coords.z } end
     end
     local atm = nearAtmCoords()
-    return atm and { x = atm.x, y = atm.y, z = atm.z } or nil
+    if atm and inAtmReach(atm) then return { x = atm.x, y = atm.y, z = atm.z } end
+    return nil
 end
 
 -- The access animation must never outlive the attempt, whatever way it ends.
@@ -649,17 +669,16 @@ local function accessAtm(target, fixed)
     if Config.atmCloseInVehicle ~= false and Kora.cache.vehicle() then
         return notify(Config.atmVehicleMessage or 'You cannot use an ATM from a vehicle.')
     end
-    if not atmPosition(target, fixed) then return notify('Move closer to an ATM.') end
+    local position = atmPosition(target, fixed)
+    if not position then return notify('Move closer to an ATM.') end
 
     openingAtm = true
     CreateThread(function()
-        -- Refuse before any animation or progress bar when the player has no bank card (the server stays the authority).
-        if Config.requireBankCard ~= false then
-            local hasCard, cardErr = request('atmCard')
-            if not hasCard then
-                openingAtm = false
-                return notify(cardErr or Config.atmNoCardMessage or 'You need a bank card to use an ATM.')
-            end
+        -- Refuse before any animation or progress bar when the card is missing or the server says we are too far (the server stays the authority).
+        local hasCard, cardErr = request('atmCard', position)
+        if not hasCard then
+            openingAtm = false
+            return notify(cardErr or Config.atmNoCardMessage or 'You need a bank card to use an ATM.')
         end
         local ok, completed, err = pcall(Kora.progressbar.start, {
             label = 'Accessing ATM...', duration = Config.atmAccessTime, canCancel = true,
@@ -679,9 +698,9 @@ local function accessAtm(target, fixed)
             if err then notify(err) end
             return
         end
-        local position = atmPosition(target, fixed)
-        if not position then return notify('Move closer to an ATM.') end
-        open('atm', position)
+        local current = atmPosition(target, fixed)
+        if not current then return notify('Move closer to an ATM.') end
+        open('atm', current)
     end)
 end
 
