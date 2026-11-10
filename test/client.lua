@@ -57,18 +57,18 @@ noCard = false
 local serverFar = false -- makes the server refuse the ATM location, as nearAtm does for a far position
 local lastOpenLocation
 _G.TriggerServerEvent = function(name, requestId, operation, mode, location)
-    if name == 'qbbanking:close' then return end
+    if name == 'kora_banking:close' then return end
     if operation == 'open' then lastOpenLocation = location end
     local result
     if operation == 'atmCard' then
         -- Mirrors server atmCardCallback: the card check honours requireBankCard, then the location check.
         local hasCard = (not noCard) or Config.requireBankCard == false
         if not hasCard then
-            netEvents['qbbanking:client:response'](requestId, nil, 'You need a bank card to use an ATM.')
+            netEvents['kora_banking:client:response'](requestId, nil, 'You need a bank card to use an ATM.')
         elseif serverFar then
-            netEvents['qbbanking:client:response'](requestId, nil, 'Move closer to an ATM.')
+            netEvents['kora_banking:client:response'](requestId, nil, 'Move closer to an ATM.')
         else
-            netEvents['qbbanking:client:response'](requestId, true, nil)
+            netEvents['kora_banking:client:response'](requestId, true, nil)
         end
         return
     end
@@ -77,7 +77,7 @@ _G.TriggerServerEvent = function(name, requestId, operation, mode, location)
         result = pinError and nil or unlockedAtm
         if pinError then result = false end
     end
-    netEvents['qbbanking:client:response'](requestId, result,
+    netEvents['kora_banking:client:response'](requestId, result,
         operation == 'action' and actionError or operation == 'pin' and pinError or nil)
 end
 
@@ -172,7 +172,7 @@ equal(createdBlips[1].options.label, nil, 'kora_lib composes the map label')
 
 branchOptions[1].onSelect()
 local bank = apps[#apps]
-equal(bank.id, 'qbbanking:bank', 'banking registers the shared AppShell')
+equal(bank.id, 'kora_banking:bank', 'banking registers the shared AppShell')
 equal(bank.layout, 'standard', 'a branch uses the standard workspace')
 local accounts = view(bank, 'accounts').tabs[1].content.blocks[2]
 equal(accounts.layout, 'cards', 'accounts use cards')
@@ -336,7 +336,7 @@ equal(createdBlips[7].options.sprite, 106, 'a config update recreates markers wi
 equal(branchOptions[1].label, 'Open Blaine County Savings', 'a config update re-registers the branch prompts with branch names')
 Config.tiers.enabled = false
 
-print(('qbbanking client: %d assertions passed'):format(passed))
+print(('kora_banking client: %d assertions passed'):format(passed))
 
 -- The ATM animation is always stopped, and a failing progress bar notifies instead of leaving the player stuck.
 local realStart = Kora.progressbar.start
@@ -482,4 +482,4 @@ Config.requireBankCard = true
 Kora.progressbar.start = realStart
 Config.atmCoords = nil
 _G.GetClosestObjectOfType = function() return 44 end
-print(('qbbanking client: ATM reach checks passed (%d assertions total)'):format(passed))
+print(('kora_banking client: ATM reach checks passed (%d assertions total)'):format(passed))

@@ -100,8 +100,8 @@ assert(loadfile(root .. 'server.lua', 't', env))()
 for _, thread in ipairs(threads) do thread() end
 
 local function send(recipient, amount)
-    assert(callbacks['qbbanking:open'](1, 'bank', 1))
-    return callbacks['qbbanking:action'](1, { kind = 'transfer', from = 'checking', recipient = recipient, amount = amount })
+    assert(callbacks['kora_banking:open'](1, 'bank', 1))
+    return callbacks['kora_banking:action'](1, { kind = 'transfer', from = 'checking', recipient = recipient, amount = amount })
 end
 local function lastStatements(n) local out = {} for i = #statements - n + 1, #statements do out[#out + 1] = statements[i] end return out end
 

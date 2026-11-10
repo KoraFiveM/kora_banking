@@ -2,7 +2,7 @@ local Accounts = {}
 local Sessions = {}
 local ready = false
 local durableHistory = false
-AddEventHandler('qbbanking:durableReady', function() durableHistory = true end)
+AddEventHandler('kora_banking:durableReady', function() durableHistory = true end)
 
 if not Kora.shared.get('items', 'bank_card') then
     local itemRegistered, itemError = Kora.shared.register('items', 'bank_card', {
@@ -16,7 +16,7 @@ if not Kora.shared.get('items', 'bank_card') then
         description = 'A personal debit card used to access ATMs.',
     })
     if not itemRegistered then
-        print(('^1[qbbanking]^7 bank card registration failed: %s'):format(itemError or 'unknown error'))
+        print(('^1[kora_banking]^7 bank card registration failed: %s'):format(itemError or 'unknown error'))
     end
 end
 
@@ -146,7 +146,7 @@ local function refreshAccount(name)
     return row
 end
 
-AddEventHandler('qbbanking:refreshAccount', refreshAccount)
+AddEventHandler('kora_banking:refreshAccount', refreshAccount)
 
 local function createAccount(name, balance, kind, citizenid, memberJson)
     if Accounts[name] then return false end
@@ -595,7 +595,7 @@ local function manage(src, data, payload, branch)
             name = cleanText(('%s %s'):format(info.firstname or '', info.lastname or ''), data.citizenid, 80),
             cardNumber = tostring(math.random(10000000, 99999999)) .. tostring(math.random(10000000, 99999999)),
             cardPin = tonumber(pin),
-        }, 'qbbanking:order-card')
+        }, 'kora_banking:order-card')
         if not added then return nil, 'There is no room for a bank card.' end
         return 'Bank card issued.'
     end
@@ -690,7 +690,7 @@ end
 local function openCallback(src, mode, location)
     local ok, result, err = pcall(openBanking, src, mode, location)
     if ok then return result, err end
-    print(('^1[qbbanking]^7 open failed for %s: %s'):format(src, tostring(result)))
+    print(('^1[kora_banking]^7 open failed for %s: %s'):format(src, tostring(result)))
     return nil, 'The bank encountered an internal error.'
 end
 
@@ -750,16 +750,16 @@ local function actionCallback(src, payload)
     local ok, result, resultErr = pcall(runAction, src, current, data, payload)
     current.busy = nil
     if not ok then
-        print(('^1[qbbanking]^7 action failed for %s: %s'):format(src, tostring(result)))
+        print(('^1[kora_banking]^7 action failed for %s: %s'):format(src, tostring(result)))
         return nil, 'The bank encountered an internal error.'
     end
     return result, resultErr
 end
 
 local function registerCallbacks()
-    Kora.callback.register('qbbanking:open', openCallback)
-    Kora.callback.register('qbbanking:pin', pinCallback)
-    Kora.callback.register('qbbanking:action', actionCallback)
+    Kora.callback.register('kora_banking:open', openCallback)
+    Kora.callback.register('kora_banking:pin', pinCallback)
+    Kora.callback.register('kora_banking:action', actionCallback)
 end
 
 registerCallbacks()
@@ -767,7 +767,7 @@ registerCallbacks()
 -- Banking's own request channel is deliberately independent from kora_lib's
 -- callback registry. A live kora_lib reload must not make open/PIN/action
 -- requests disappear while kora_banking itself remains running.
-RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
+RegisterNetEvent('kora_banking:server:request', function(requestId, operation, ...)
     local src = source
     if type(requestId) ~= 'number' or requestId % 1 ~= 0 or requestId < 1 then return end
 
@@ -776,15 +776,15 @@ RegisterNetEvent('qbbanking:server:request', function(requestId, operation, ...)
         or operation == 'pin' and pinCallback
         or operation == 'action' and actionCallback
     if not handler then
-        return TriggerClientEvent('qbbanking:client:response', src, requestId, nil, 'Invalid banking request.')
+        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, 'Invalid banking request.')
     end
 
     local ok, result, err = pcall(handler, src, ...)
     if not ok then
-        print(('^1[qbbanking]^7 %s request failed for %s: %s'):format(operation, src, tostring(result)))
-        return TriggerClientEvent('qbbanking:client:response', src, requestId, nil, 'The bank encountered an internal error.')
+        print(('^1[kora_banking]^7 %s request failed for %s: %s'):format(operation, src, tostring(result)))
+        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, 'The bank encountered an internal error.')
     end
-    TriggerClientEvent('qbbanking:client:response', src, requestId, result, err)
+    TriggerClientEvent('kora_banking:client:response', src, requestId, result, err)
 end)
 
 -- kora_lib owns callback registrations. Reinstall ours after a live kora_lib
@@ -839,7 +839,7 @@ bankingExport('GetGangAccount', function(name) return Accounts[name] end)
 bankingExport('GetAccountBalance', function(name) return Accounts[name] and tonumber(Accounts[name].account_balance) or 0 end)
 
 exports.kora_core:createUseable('bank_card', function(src)
-    if hasBankCard(src) then TriggerClientEvent('qbbanking:client:useCard', src) end
+    if hasBankCard(src) then TriggerClientEvent('kora_banking:client:useCard', src) end
 end)
 
 exports.kora_core:addCommand('givecash', 'Give nearby player cash', {
@@ -860,7 +860,7 @@ exports.kora_core:addCommand('givecash', 'Give nearby player cash', {
     Kora.notify.send(target, { title = 'Banking', message = ('Received $%d.'):format(amount), type = 'success' })
 end)
 
-RegisterNetEvent('qbbanking:close', function() Sessions[source] = nil end)
+RegisterNetEvent('kora_banking:close', function() Sessions[source] = nil end)
 AddEventHandler('playerDropped', function()
     Sessions[source] = nil
 end)
@@ -868,18 +868,18 @@ end)
 CreateThread(function()
     local available, readyErr = Kora.sql.ready(60000)
     if not available then
-        print(('^1[qbbanking]^7 database unavailable: %s'):format(readyErr or 'unknown error'))
+        print(('^1[kora_banking]^7 database unavailable: %s'):format(readyErr or 'unknown error'))
         return
     end
     -- Idempotent; guarantees bank_accounts/bank_statements exist before the first read (finance.lua ensures the same schema).
-    local ensured, ensureErr = Kora.sql.ensureTables(QBBankingSchema)
+    local ensured, ensureErr = Kora.sql.ensureTables(KoraBankingSchema)
     if not ensured then
-        print(('^1[qbbanking]^7 schema setup failed: %s'):format(ensureErr or 'unknown error'))
+        print(('^1[kora_banking]^7 schema setup failed: %s'):format(ensureErr or 'unknown error'))
         return
     end
     local rows, loadErr = Kora.sql.query('SELECT * FROM bank_accounts')
     if not rows then
-        print(('^1[qbbanking]^7 account load failed: %s'):format(loadErr or 'unknown error'))
+        print(('^1[kora_banking]^7 account load failed: %s'):format(loadErr or 'unknown error'))
         return
     end
     for _, account in ipairs(rows) do Accounts[account.account_name] = account end
@@ -890,7 +890,7 @@ CreateThread(function()
         local name = definition.name
         if name ~= 'unemployed' and not Accounts[name] then
             if not createJobAccount(name, 0) then
-                print(('^1[qbbanking]^7 job account creation failed for %s'):format(name))
+                print(('^1[kora_banking]^7 job account creation failed for %s'):format(name))
                 return
             end
         end
@@ -900,7 +900,7 @@ CreateThread(function()
         local name = definition.name
         if name ~= 'none' and not Accounts[name] then
             if not createGangAccount(name, 0) then
-                print(('^1[qbbanking]^7 gang account creation failed for %s'):format(name))
+                print(('^1[kora_banking]^7 gang account creation failed for %s'):format(name))
                 return
             end
         end

@@ -3,7 +3,7 @@
 -- kora_lib owns the browser frame and focus lifecycle.
 
 local RESOURCE = GetCurrentResourceName()
-local APP_ID = 'qbbanking:bank'
+local APP_ID = 'kora_banking:bank'
 local REQUEST_TIMEOUT = 10000
 
 local openingAtm = false
@@ -28,7 +28,7 @@ local function request(operation, ...)
     local requestId = nextRequestId
     local response = promise.new()
     pendingRequests[requestId] = response
-    TriggerServerEvent('qbbanking:server:request', requestId, operation, ...)
+    TriggerServerEvent('kora_banking:server:request', requestId, operation, ...)
 
     SetTimeout(REQUEST_TIMEOUT, function()
         if pendingRequests[requestId] ~= response then return end
@@ -41,7 +41,7 @@ local function request(operation, ...)
     return reply.result, reply.error
 end
 
-RegisterNetEvent('qbbanking:client:response', function(requestId, result, err)
+RegisterNetEvent('kora_banking:client:response', function(requestId, result, err)
     local response = pendingRequests[requestId]
     if not response then return end
     pendingRequests[requestId] = nil
@@ -545,7 +545,7 @@ local function closeSession()
     if not appOpen then return end
     appOpen = false
     currentSnapshot = nil
-    TriggerServerEvent('qbbanking:close')
+    TriggerServerEvent('kora_banking:close')
 end
 
 -- ATM sessions end when the player drives off or walks away from the machine (Config.atmCloseDistance, 0 disables the distance check).
@@ -591,7 +591,7 @@ local function open(mode, location)
             if Kora.cache.vehicle() and Config.atmCloseInVehicle ~= false then
                 appOpen = false
                 currentSnapshot = nil
-                TriggerServerEvent('qbbanking:close')
+                TriggerServerEvent('kora_banking:close')
                 return notify(Config.atmVehicleMessage or 'You cannot use an ATM from a vehicle.')
             end
             watchAtmSession(location)
@@ -848,7 +848,7 @@ if Kora.config and Kora.config.onChange then
     Kora.config.onChange('tiers.default', refreshBranches)
 end
 
-RegisterNetEvent('qbbanking:client:useCard', accessAtm)
+RegisterNetEvent('kora_banking:client:useCard', accessAtm)
 RegisterNetEvent('qb-banking:client:useCard', accessAtm)
 
 AddEventHandler('onResourceStop', function(resource)

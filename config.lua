@@ -102,7 +102,7 @@ if Kora and Kora.config and Kora.config.adopt then
     local config = Kora.config
     Config.atmModels = config.list(Config.atmModels, nil, {
         label = 'ATM models', advanced = true,
-        description = 'Model names treated as cash machines by targeting and nearby ATM lookup. Restart qbbanking to apply saved changes.',
+        description = 'Model names treated as cash machines by targeting and nearby ATM lookup. Restart kora_banking to apply saved changes.',
     })
     Config.atmCoords = config.list(Config.atmCoords, nil, {
         label = 'ATM fallback coordinates', advanced = true,
@@ -116,7 +116,7 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.atmDistance = config.number(Config.atmDistance, {
         min = 0,
         label = 'ATM interaction distance (metres)', advanced = false,
-        description = 'Maximum client distance for finding or targeting an ATM; the server allows an extra 1 metre of tolerance. Restart qbbanking to apply saved changes.',
+        description = 'Maximum client distance for finding or targeting an ATM; the server allows an extra 1 metre of tolerance. Restart kora_banking to apply saved changes.',
     })
     Config.atmTolerance = config.number(Config.atmTolerance, {
         min = 0,
@@ -126,7 +126,7 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.atmAccessTime = config.integer(Config.atmAccessTime, {
         min = 0,
         label = 'ATM access time (milliseconds)', advanced = false,
-        description = 'Duration of the cancellable progress bar before opening an ATM. 1000 milliseconds equals 1 second. Restart qbbanking to apply saved changes.',
+        description = 'Duration of the cancellable progress bar before opening an ATM. 1000 milliseconds equals 1 second. Restart kora_banking to apply saved changes.',
     })
     Config.atmAccessMovement = config.enum(Config.atmAccessMovement, {
         options = {
@@ -167,12 +167,12 @@ if Kora and Kora.config and Kora.config.adopt then
     })
     Config.useDailyLimit = config.boolean(Config.useDailyLimit, {
         label = 'Limit daily ATM withdrawals', advanced = false,
-        description = 'Enforces the daily personal-account withdrawal allowance at ATMs; bank-counter withdrawals are not blocked by this limit but count toward it. Restart qbbanking to apply saved changes.',
+        description = 'Enforces the daily personal-account withdrawal allowance at ATMs; bank-counter withdrawals are not blocked by this limit but count toward it. Restart kora_banking to apply saved changes.',
     })
     Config.dailyLimit = config.integer(Config.dailyLimit, {
         min = 0,
         label = 'Daily ATM allowance ($)', advanced = false,
-        description = 'Maximum personal-account withdrawals per character since midnight on the database clock when daily limits are enabled. Bank-counter withdrawals also count toward this allowance. Restart qbbanking to apply saved changes.',
+        description = 'Maximum personal-account withdrawals per character since midnight on the database clock when daily limits are enabled. Bank-counter withdrawals also count toward this allowance. Restart kora_banking to apply saved changes.',
     })
     Config.minAmount.withdraw = config.integer(Config.minAmount.withdraw, {
         min = 1,
@@ -209,49 +209,49 @@ if Kora and Kora.config and Kora.config.adopt then
     Config.maxAccounts = config.integer(Config.maxAccounts, {
         min = 0,
         label = 'Shared accounts per character', advanced = false,
-        description = 'Maximum shared accounts a character may own; personal and job accounts are not counted. Restart qbbanking to apply saved changes.',
+        description = 'Maximum shared accounts a character may own; personal and job accounts are not counted. Restart kora_banking to apply saved changes.',
     })
     Config.maxSharedMembers = config.integer(Config.maxSharedMembers, {
         min = 0,
         label = 'Members per shared account', advanced = false,
-        description = 'Maximum additional members on a shared account. Lowering this also truncates loaded access lists, so existing members may lose access. Restart qbbanking to apply saved changes.',
+        description = 'Maximum additional members on a shared account. Lowering this also truncates loaded access lists, so existing members may lose access. Restart kora_banking to apply saved changes.',
     })
     Config.maxSharedMemberBytes = config.integer(Config.maxSharedMemberBytes, {
         min = 0,
         label = 'Member list storage limit (bytes)', advanced = true,
-        description = 'Maximum JSON size of a shared-account member list. Oversized stored lists are read as empty and oversized membership updates are rejected. Restart qbbanking to apply saved changes.',
+        description = 'Maximum JSON size of a shared-account member list. Oversized stored lists are read as empty and oversized membership updates are rejected. Restart kora_banking to apply saved changes.',
     })
     Config.memberRateLimit.max = config.integer(Config.memberRateLimit.max, {
         min = 0,
         label = 'Membership requests per window', advanced = true,
-        description = 'Maximum member-management requests accepted per player during the rolling time window. Further requests are rejected until older requests expire. Restart qbbanking to apply saved changes.',
+        description = 'Maximum member-management requests accepted per player during the rolling time window. Further requests are rejected until older requests expire. Restart kora_banking to apply saved changes.',
     })
     Config.memberRateLimit.window = config.integer(Config.memberRateLimit.window, {
         min = 1,
         label = 'Membership request window (milliseconds)', advanced = true,
-        description = 'Rolling period used to limit member-management requests per player. 10000 milliseconds equals 10 seconds. Restart qbbanking to apply saved changes.',
+        description = 'Rolling period used to limit member-management requests per player. 10000 milliseconds equals 10 seconds. Restart kora_banking to apply saved changes.',
     })
     Config.blipInfo.category = config.string(Config.blipInfo.category, {
         minLength = 1,
         label = 'Bank map category', advanced = true,
-        description = 'Named kora_lib map-legend category for bank markers; use a supported category name such as Bank. Restart qbbanking to apply saved changes.',
+        description = 'Named kora_lib map-legend category for bank markers; use a supported category name such as Bank. Restart kora_banking to apply saved changes.',
     })
     Config.blipInfo.sprite = config.integer(Config.blipInfo.sprite, {
         label = 'Bank map icon ID', advanced = true,
-        description = 'GTA blip sprite ID used for every bank marker. Restart qbbanking to apply saved changes.',
+        description = 'GTA blip sprite ID used for every bank marker. Restart kora_banking to apply saved changes.',
     })
     Config.blipInfo.color = config.integer(Config.blipInfo.color, {
         label = 'Bank map colour ID', advanced = true,
-        description = 'GTA blip colour index used for every bank marker. Restart qbbanking to apply saved changes.',
+        description = 'GTA blip colour index used for every bank marker. Restart kora_banking to apply saved changes.',
     })
     Config.blipInfo.scale = config.number(Config.blipInfo.scale, {
         min = 0,
         label = 'Bank map icon size', advanced = false,
-        description = 'Size multiplier for bank markers; 1 is standard size and 0.55 is 55 percent. Restart qbbanking to apply saved changes.',
+        description = 'Size multiplier for bank markers; 1 is standard size and 0.55 is 55 percent. Restart kora_banking to apply saved changes.',
     })
     Config.blipInfo.shortRange = config.boolean(Config.blipInfo.shortRange, {
         label = 'Show bank markers only nearby', advanced = false,
-        description = 'Makes bank markers short-range on the minimap; their pause-map category remains available. Restart qbbanking to apply saved changes.',
+        description = 'Makes bank markers short-range on the minimap; their pause-map category remains available. Restart kora_banking to apply saved changes.',
     })
     Config.tiers.enabled = config.boolean(Config.tiers.enabled, {
         label = 'Enable bank tiers (Fleeca / Pacific Standard)', advanced = false,
@@ -293,7 +293,7 @@ if Kora and Kora.config and Kora.config.adopt then
     end
     Config.locations = config.list(Config.locations, nil, {
         label = 'Bank locations', advanced = true,
-        description = 'Bank locations used for interactions, server proximity checks, and map markers. Each entry is plain X/Y/Z coordinates or a table with coords, tier and label. Restart qbbanking to apply saved changes.',
+        description = 'Bank locations used for interactions, server proximity checks, and map markers. Each entry is plain X/Y/Z coordinates or a table with coords, tier and label. Restart kora_banking to apply saved changes.',
     })
     Config = config.adopt(Config)
 end

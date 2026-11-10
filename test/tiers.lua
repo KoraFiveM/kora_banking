@@ -96,9 +96,9 @@ local Tiers, Config = env.BankingTiers, env.Config
 
 local function at(where) pos.x, pos.y, pos.z = where.x, where.y, where.z end
 local function act(payload, index)
-    local snapshot, err = callbacks['qbbanking:open'](1, 'bank', index or 1)
+    local snapshot, err = callbacks['kora_banking:open'](1, 'bank', index or 1)
     assert(snapshot, 'branch must open: ' .. tostring(err))
-    return callbacks['qbbanking:action'](1, payload)
+    return callbacks['kora_banking:action'](1, payload)
 end
 local function reset() player.money.cash, player.money.bank, other.money.bank, used = 100000, 1000000, 0, 0 end
 
@@ -135,7 +135,7 @@ Config.tiers = presets()
 
 -- Enabled at a Fleeca branch.
 at(FLEECA); reset()
-local snap = callbacks['qbbanking:open'](1, 'bank', 1)
+local snap = callbacks['kora_banking:open'](1, 'bank', 1)
 check(snap.branch.tier == 'fleeca' and snap.branch.label == 'Fleeca Bank - Test', 'snapshot names the branch')
 check(snap.branch.gated.sharedAccounts == 'Pacific Standard' and snap.branch.gated.manageMembers == 'Pacific Standard', 'snapshot says where gated features live')
 check(snap.branch.gated.deposit == nil and snap.limits.maxTransfer == 10000 and snap.limits.counterDaily == 5000, 'snapshot carries the tier limits')
@@ -169,7 +169,7 @@ Config.tiers.list.fleeca.features.withdraw = true
 
 -- Enabled at Pacific Standard: shared accounts, members and large transfers pass the tier gate.
 at(BIG); reset()
-snap = callbacks['qbbanking:open'](1, 'bank', 2)
+snap = callbacks['kora_banking:open'](1, 'bank', 2)
 check(snap.branch.tier == 'bigbank' and next(snap.branch.gated) == nil and snap.limits.maxTransfer == nil, 'bigbank gates nothing and has no transfer cap')
 result, err = act({ kind = 'create', name = 'My Club', amount = 10 }, 2)
 check(result and result.message == 'Shared account created.', 'bigbank can open shared accounts: ' .. tostring(err))
@@ -184,21 +184,21 @@ check(act({ kind = 'withdraw', account = 'checking', amount = 200 }, 2), 'bigban
 
 -- A client cannot choose its tier: the index of a Pacific Standard branch from a Fleeca counter still means Fleeca.
 at(FLEECA); reset()
-snap = callbacks['qbbanking:open'](1, 'bank', 2)
+snap = callbacks['kora_banking:open'](1, 'bank', 2)
 check(snap.branch.tier == 'fleeca', 'the tier follows the player position, not the client-sent index')
-result, err = callbacks['qbbanking:action'](1, { kind = 'create', name = 'Sneaky Club', amount = 10 })
+result, err = callbacks['kora_banking:action'](1, { kind = 'create', name = 'Sneaky Club', amount = 10 })
 check(result == nil and err:find('only available at Pacific Standard', 1, true), 'spoofing the index does not unlock Pacific Standard features')
 -- The tier is re-resolved from the player's position on every action (a stale session tier is never reused).
 at(BIG)
-result = callbacks['qbbanking:action'](1, { kind = 'transfer', from = 'checking', recipient = 'XYZ789', amount = 50000 })
+result = callbacks['kora_banking:action'](1, { kind = 'transfer', from = 'checking', recipient = 'XYZ789', amount = 50000 })
 check(result and result.snapshot.branch.tier == 'bigbank', 'the tier is re-resolved from the current position on each action')
 at(FLEECA)
-result, err = callbacks['qbbanking:action'](1, { kind = 'transfer', from = 'checking', recipient = 'XYZ789', amount = 50000 })
+result, err = callbacks['kora_banking:action'](1, { kind = 'transfer', from = 'checking', recipient = 'XYZ789', amount = 50000 })
 check(result == nil and err:find('Transfers above $10000', 1, true), 'walking back to Fleeca restores the Fleeca limits')
 at({ x = 5000, y = 5000, z = 30 })
-check(select(2, callbacks['qbbanking:action'](1, { kind = 'deposit', account = 'checking', amount = 5 })) == 'Your banking session expired.', 'leaving every branch ends the session')
+check(select(2, callbacks['kora_banking:action'](1, { kind = 'deposit', account = 'checking', amount = 5 })) == 'Your banking session expired.', 'leaving every branch ends the session')
 at(LEGACY)
-snap = callbacks['qbbanking:open'](1, 'bank', 3)
+snap = callbacks['kora_banking:open'](1, 'bank', 3)
 check(snap.branch.tier == 'fleeca', 'legacy plain-coordinate branches open on the default tier')
 
 -- The counter cap counts withdrawals from every account (shared ones too); the sql flag is 1 only for tier caps.
@@ -211,12 +211,12 @@ onScalar = nil
 
 -- Overlapping requests from one player are serialised so two withdrawals cannot both pass the same cap.
 local nested
-callbacks['qbbanking:open'](1, 'bank', 1)
+callbacks['kora_banking:open'](1, 'bank', 1)
 onScalar = function()
     onScalar = nil
-    nested = select(2, callbacks['qbbanking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }))
+    nested = select(2, callbacks['kora_banking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }))
 end
-check(callbacks['qbbanking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }), 'the outer request still completes')
+check(callbacks['kora_banking:action'](1, { kind = 'withdraw', account = 'checking', amount = 5 }), 'the outer request still completes')
 check(nested == 'Your previous banking request is still being processed.', 'an overlapping request is rejected: ' .. tostring(nested))
 check(act({ kind = 'withdraw', account = 'checking', amount = 5 }), 'the lock is released afterwards')
-print(('qbbanking tiers: %d assertions passed'):format(passed))
+print(('kora_banking tiers: %d assertions passed'):format(passed))

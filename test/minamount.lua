@@ -75,8 +75,8 @@ assert(loadfile(root .. 'tiers.lua', 't', env))()
 for _, thread in ipairs(threads) do thread() end
 
 local function act(payload)
-    assert(callbacks['qbbanking:open'](1, 'bank', 1), 'branch must open')
-    local result, err = callbacks['qbbanking:action'](1, payload)
+    assert(callbacks['kora_banking:open'](1, 'bank', 1), 'branch must open')
+    local result, err = callbacks['kora_banking:action'](1, payload)
     return result, err
 end
 local function reset() player.money.cash, player.money.bank, other.money.bank = 100, 1000, 0 end
@@ -127,9 +127,9 @@ check(select(2, act(kinds.withdraw.payload(9))) == 'Minimum withdrawal is $10.',
 -- Internal transfers are covered too, and the snapshot exposes the minimums to the client.
 env.Config.minAmount = { withdraw = 5, deposit = 6, transfer = 7 }
 check(select(2, act({ kind = 'transfer', from = 'checking', to = 'club', amount = 3 })) == 'Minimum transfer is $7.', 'internal transfer minimum')
-local snap = callbacks['qbbanking:open'](1, 'bank', 1)
+local snap = callbacks['kora_banking:open'](1, 'bank', 1)
 check(snap.limits.min.withdraw == 5 and snap.limits.min.deposit == 6 and snap.limits.min.transfer == 7, 'snapshot carries the minimums')
 env.Config.minAmount = { withdraw = 'junk', deposit = -3, transfer = 0 }
-snap = callbacks['qbbanking:open'](1, 'bank', 1)
+snap = callbacks['kora_banking:open'](1, 'bank', 1)
 check(snap.limits.min.withdraw == 1 and snap.limits.min.deposit == 1 and snap.limits.min.transfer == 1, 'invalid minimums fall back to 1')
-print(('qbbanking minimum amounts: %d assertions passed'):format(passed))
+print(('kora_banking minimum amounts: %d assertions passed'):format(passed))

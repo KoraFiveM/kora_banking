@@ -12,7 +12,7 @@ local function boot()
     local api, threads, f = {}, {}, {}
     local core = {}
     function core.beginPlayerColumnOperation(_, key, ids)
-        local token = 'qbbanking:' .. key
+        local token = 'kora_banking:' .. key
         local resumed = locks[token] ~= nil
         locks[token] = locks[token] or { token = token, operationKey = key, citizenids = copy(ids) }
         return token, resumed and 'resumed' or nil
@@ -29,7 +29,7 @@ local function boot()
         return true
     end
     function core.abortPlayerColumnOperation(_, token) locks[token] = nil; return true end
-    local sql = { NULL = '\0qbsql:null\0', ready = function() return true end, ensureTables = function() return { {} } end }
+    local sql = { NULL = '\0kora_sql:null\0', ready = function() return true end, ensureTables = function() return { {} } end }
     function sql.awaitCheckedOperation() return { active = false } end
     function sql.scalar() return 0 end
     function sql.awaitCheckedOperations() return { settled = 0 } end
@@ -88,13 +88,13 @@ local function boot()
     env.GetCurrentResourceName = function() return 'kora_banking' end
     env.CreateThread = function(fn) threads[#threads + 1] = fn end
     env.AddEventHandler = function() end
-    env.TriggerEvent = function(name, account) if name == 'qbbanking:refreshAccount' then cache[account] = database.accounts[account] end end
+    env.TriggerEvent = function(name, account) if name == 'kora_banking:refreshAccount' then cache[account] = database.accounts[account] end end
     assert(loadfile('server/finance.lua', 't', env))()
     threads[1]()
     return api, f
 end
 
-locks['qbbanking:kora_housing:orphan'] = { token = 'qbbanking:kora_housing:orphan', operationKey = 'kora_housing:orphan', citizenids = { 'BUYER' } }
+locks['kora_banking:kora_housing:orphan'] = { token = 'kora_banking:kora_housing:orphan', operationKey = 'kora_housing:orphan', citizenids = { 'BUYER' } }
 local api, f = boot()
 check(next(locks) == nil and commits == 0, 'Startup releases a confirmed absent preparation without creating a financial mutation')
 local sale = { debits = { { citizenid = 'BUYER', amount = 1000 } }, credits = {
@@ -161,4 +161,4 @@ check(api.ExecuteTransaction('credit:negative-recipient', income) ~= nil and dat
 f.outage = true
 receipt, code = api.ExecuteTransaction('rent:outage', reserve)
 check(not receipt and code == 'unavailable', 'An outage cannot be classified as insufficient funds')
-print(('qbbanking durable finance: %d assertions passed; atomic commit, rollback, escrow, receipt/restart recovery'):format(assertions))
+print(('kora_banking durable finance: %d assertions passed; atomic commit, rollback, escrow, receipt/restart recovery'):format(assertions))

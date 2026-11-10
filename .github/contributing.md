@@ -37,8 +37,8 @@ These guidelines will help you help us in the best way possible regardless of yo
 
 > **Note:** Please don't file an issue to ask a question. You'll get faster results by using the resources below.
 
-* [QBCore Website](https://qbcore.org)
-* [QBCore Discord](https://discord.gg/qbcore)
+* [QBCore Website](https://kora_core.org)
+* [QBCore Discord](https://discord.gg/kora_core)
 * [FiveM Discord - #kora_core channel](https://discord.gg/fivem)
 
 
@@ -63,7 +63,7 @@ Before creating bug reports, please check [this list](#before-submitting-a-bug-r
 #### Before Submitting A Bug Report
 
 * **Check the docs** There's a chance what you see as a bug might just work differently than you expect and if you think it could work better consider a feature enhancement report instead.
-* **Search the [discord](https://discord.gg/qbcore)** to see if anyone else has run into the issue and see if it was solved through user error or code changes. (if the code change isn't pending a PR and you know what you're doing consider submitting one following [Pull Requests](#pull-requests) )
+* **Search the [discord](https://discord.gg/kora_core)** to see if anyone else has run into the issue and see if it was solved through user error or code changes. (if the code change isn't pending a PR and you know what you're doing consider submitting one following [Pull Requests](#pull-requests) )
 * **Determine which resource the problem should be reported in**. If the bug is related to the inventory for example report this bug under qb-inventory rather than under qb-core or some other resource.
 * **Perform a [cursory search](https://github.com/search?q=+is%3Aissue+user%3Aqbcore-framework)** to see if the problem has already been reported. If it has **and the issue is still open**, add a comment to the existing issue instead of opening a new one.
 

@@ -3,7 +3,7 @@
 local NULL = Kora.sql.NULL
 local COLLATION = 'utf8mb4_unicode_ci'
 
-QBBankingSchema = {
+KoraBankingSchema = {
     {
         name = 'bank_accounts',
         collate = COLLATION,

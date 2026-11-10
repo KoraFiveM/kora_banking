@@ -10,8 +10,8 @@ local function loadSchema()
     local env = { Kora = { sql = { NULL = { null = true } } } }
     assert(loadfile('server/schema.lua', 't', env))()
     local byName = {}
-    for _, spec in ipairs(env.QBBankingSchema) do byName[spec.name] = spec end
-    return env.QBBankingSchema, byName, env.Kora.sql.NULL
+    for _, spec in ipairs(env.KoraBankingSchema) do byName[spec.name] = spec end
+    return env.KoraBankingSchema, byName, env.Kora.sql.NULL
 end
 local list, byName, NULL = loadSchema()
 check(#list == 4, 'schema declares four tables')
@@ -45,15 +45,15 @@ local function boot(opts)
     local api = { sql = sql, timers = { setTimeout = function(fn, ms) threads[#threads + 1] = fn; timers.delays[#timers.delays + 1] = ms; return #threads end, clearTimeout = function() end } }
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.QBBankingSchema = { { name = 'bank_operation_legs' } }
-    env.Kora, env.QB, env.Config = api, api, { transactionCallers = {}, migrationRetrySeconds = opts.retry }
+    env.KoraBankingSchema = { { name = 'bank_operation_legs' } }
+    env.Kora, env.Kora, env.Config = api, api, { transactionCallers = {}, migrationRetrySeconds = opts.retry }
     env.print = function(text) printed[#printed + 1] = text end
     env.exports = setmetatable({ kora_core = {} }, { __call = function() end })
     env.GetInvokingResource = function() return 'kora_housing' end
     env.GetCurrentResourceName = function() return 'kora_banking' end
     env.CreateThread = function(fn) threads[#threads + 1] = fn end
     env.AddEventHandler = function() end
-    env.TriggerEvent = function(name) if name == 'qbbanking:durableReady' then calls.ready = true end end
+    env.TriggerEvent = function(name) if name == 'kora_banking:durableReady' then calls.ready = true end end
     assert(loadfile('server/finance.lua', 't', env))()
     threads[1]()
     return calls, printed, timers
@@ -68,4 +68,4 @@ calls, printed, timers = boot({ migrateError = 'boom' })
 check(not calls.ready and printed[1]:find('stay disabled', 1, true) and #timers.delays == 0, 'schema failure is logged clearly; no retry by default')
 calls, printed, timers = boot({ migrateError = 'boom', retry = 120 })
 check(not calls.ready and timers.delays[1] == 120000, 'migrationRetrySeconds schedules a retry')
-print(('qbbanking migrations: %d assertions passed; Lua schema, no conversions at boot, failure handling'):format(assertions))
+print(('kora_banking migrations: %d assertions passed; Lua schema, no conversions at boot, failure handling'):format(assertions))

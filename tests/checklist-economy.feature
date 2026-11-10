@@ -9,7 +9,7 @@ Feature: kora_banking — Economy
     """
     When I go to "legion_square"
     And I manually: walk to the Fleeca Bank branch counter and select the Open target option
-    Then the "qbbanking:bank" app opens
+    Then the "kora_banking:bank" app opens
     And I confirm: the banking app shows accounts, cash and transfer tabs
 
   @kora_banking @checklist @checklist:kora_banking:bank-map-markers @cat:economy @manual
@@ -28,7 +28,7 @@ Feature: kora_banking — Economy
     Given my cash balance is 500
     When I manually: go to a bank branch
     And I manually: open the banking app
-    Then the "qbbanking:bank" app opens
+    Then the "kora_banking:bank" app opens
     When I manually: open the Cash tab, select an account, enter a reference and deposit some cash
     Then I confirm: my balances update after the deposit
     When I manually: withdraw some cash with an account selected and a reference
@@ -40,7 +40,7 @@ Feature: kora_banking — Economy
     Checklist test: Transfer tab: send to citizen ID, shared/society/gang account name or card number; offline players credited.
     """
     When I manually: go to a bank branch and open the banking app
-    Then the "qbbanking:bank" app opens
+    Then the "kora_banking:bank" app opens
     When I manually: go to the Transfer tab
     And I manually: send money to a citizen ID, a shared, society or gang account name, and a card number
     And I manually: send money to an offline player's citizen ID
@@ -52,7 +52,7 @@ Feature: kora_banking — Economy
     Checklist test: Activity tab lists type, amount, reference, date; sortable.
     """
     When I manually: go to a bank branch and open the banking app
-    Then the "qbbanking:bank" app opens
+    Then the "kora_banking:bank" app opens
     When I manually: go to the Activity tab
     Then I confirm: the list shows type, amount, reference and date for each entry
     And I confirm: the list can be sorted
@@ -64,7 +64,7 @@ Feature: kora_banking — Economy
     """
     Given I have no "bank_card"
     When I manually: go to a bank branch and open the banking app
-    Then the "qbbanking:bank" app opens
+    Then the "kora_banking:bank" app opens
     When I manually: order a bank card and choose a PIN
     Then I should have 1 "bank_card"
 

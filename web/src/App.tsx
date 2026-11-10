@@ -43,7 +43,7 @@ function PinScreen({ snapshot, close, unlock }: { snapshot: Snapshot; close: () 
   async function submit(value = pin) {
     if (value.length !== 4 || busy) return
     setBusy(true); setError(undefined)
-    const response = await fetchNui<NuiResult>("qbbanking:pin", { pin: value })
+    const response = await fetchNui<NuiResult>("kora_banking:pin", { pin: value })
     setBusy(false)
     if (response.ok && response.snapshot) unlock(response.snapshot)
     else { setPin(""); setError(response.error ?? "Incorrect PIN.") }
@@ -189,7 +189,7 @@ function Bank({ snapshot, close, update }: { snapshot: Snapshot; close: () => vo
   async function run(data: object) {
     setError(undefined)
     try {
-      const response = await fetchNui<NuiResult>("qbbanking:action", data)
+      const response = await fetchNui<NuiResult>("kora_banking:action", data)
       if (!response.ok || !response.result) { setError(response.error ?? "The request was declined."); return false }
       update(response.result.snapshot); return true
     } catch { setError("The bank did not answer."); return false }
@@ -213,18 +213,18 @@ function Bank({ snapshot, close, update }: { snapshot: Snapshot; close: () => vo
 export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>()
   useEffect(() => {
-    void fetchNui("qbbanking:ready")
+    void fetchNui("kora_banking:ready")
     const message = (event: MessageEvent<{ action?: string; data?: Snapshot }>) => {
-      if (event.data?.action === "qbbanking:open" && event.data.data) setSnapshot(event.data.data)
-      if (event.data?.action === "qbbanking:close") setSnapshot(undefined)
+      if (event.data?.action === "kora_banking:open" && event.data.data) setSnapshot(event.data.data)
+      if (event.data?.action === "kora_banking:close") setSnapshot(undefined)
     }
     const key = (event: KeyboardEvent) => { if (event.key === "Escape") void close() }
     window.addEventListener("message", message); window.addEventListener("keydown", key)
     return () => { window.removeEventListener("message", message); window.removeEventListener("keydown", key) }
   }, [])
-  const close = useMemo(() => () => { setSnapshot(undefined); void fetchNui("qbbanking:close") }, [])
+  const close = useMemo(() => () => { setSnapshot(undefined); void fetchNui("kora_banking:close") }, [])
   async function runAtm(data: object) {
-    const response = await fetchNui<NuiResult>("qbbanking:action", data)
+    const response = await fetchNui<NuiResult>("kora_banking:action", data)
     if (response.ok && response.result) { setSnapshot(response.result.snapshot); return true }
     return false
   }

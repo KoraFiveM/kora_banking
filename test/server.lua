@@ -6,7 +6,7 @@ local statementResult, updateFails
 local function noop() end
 local env = setmetatable({
     BankingDates = BankingDates,
-    QBBankingSchema = {},
+    KoraBankingSchema = {},
     Kora = {
         shared = { get = function() return {} end, epoch = function() return 1 end, all = function() return {} end },
         util = {
@@ -104,7 +104,7 @@ assert(balance == 1000 and statements == previousStatements,
 updateFails, statementResult = false, 1
 assert(api.AddMoney('police', 100) == true and api.RemoveMoney('police', 100) == true)
 assert(balance == 1000 and statements == previousStatements + 2)
-print('qbbanking server: balance outcomes and history failure regression passed')
+print('kora_banking server: balance outcomes and history failure regression passed')
 
 local callbacks, created = {}, {}
 env.Config = { locations = {} }
@@ -127,7 +127,7 @@ threads[#threads]()
 assert(created.police and created.police.account_type == 'job' and created.police.account_balance == 0)
 assert(created.ballas and created.ballas.account_type == 'gang' and created.ballas.account_balance == 0)
 assert(not created.unemployed and not created.none)
-local _, openError = callbacks['qbbanking:open'](1, 'bank', 1)
+local _, openError = callbacks['kora_banking:open'](1, 'bank', 1)
 assert(openError == 'Move closer to a bank counter.', 'successful organization bootstrap must reach ready')
 
 local logged = false
@@ -135,9 +135,9 @@ env.print = function(message) logged = message:find('account creation failed', 1
 env.Kora.sql.insert = function() return nil, 'controlled account creation failure' end
 assert(loadfile(root .. 'server.lua', 't', env))()
 threads[#threads]()
-_, openError = callbacks['qbbanking:open'](1, 'bank', 1)
+_, openError = callbacks['kora_banking:open'](1, 'bank', 1)
 assert(logged and openError == 'Banking is still starting.', 'failed account creation must log and leave banking unready')
-print('qbbanking server: fresh organization-account bootstrap regression passed')
+print('kora_banking server: fresh organization-account bootstrap regression passed')
 
 -- Statement history UNIONs bank_statements with bank_operation_legs; installs where the legs table kept the
 -- server default collation must not raise "Illegal mix of collations", so every string column is pinned.
@@ -163,9 +163,9 @@ do
     local schemaEnv = { Kora = { sql = { NULL = {} } } }
     assert(loadfile(root .. 'server/schema.lua', 't', schemaEnv))()
     local legs
-    for _, spec in ipairs(schemaEnv.QBBankingSchema) do if spec.name == 'bank_operation_legs' then legs = spec end end
+    for _, spec in ipairs(schemaEnv.KoraBankingSchema) do if spec.name == 'bank_operation_legs' then legs = spec end end
     assert(legs and legs.collate == 'utf8mb4_unicode_ci', 'schema must pin bank_operation_legs collation')
 end
 assert(not readFile(root .. 'server/finance.lua'):find('CONVERT TO CHARACTER SET', 1, true), 'boot must not convert existing tables')
-assert(readFile(root .. 'server/finance.lua'):find('Kora.sql.ensureTables(QBBankingSchema)', 1, true), 'bootstrap must apply the Lua schema')
-print('qbbanking server: statement UNION collation regression passed')
+assert(readFile(root .. 'server/finance.lua'):find('Kora.sql.ensureTables(KoraBankingSchema)', 1, true), 'bootstrap must apply the Lua schema')
+print('kora_banking server: statement UNION collation regression passed')

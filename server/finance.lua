@@ -60,7 +60,7 @@ end
 local function receipt(resource, key, expectedRequest)
     -- A stopped caller can leave its old driver worker running before it has
     -- acquired the receipt row. Join it before treating an absent receipt as safe.
-    local settled, waitErr = Kora.sql.awaitCheckedOperation('qbbanking:' .. operationId(resource, key), expectedRequest)
+    local settled, waitErr = Kora.sql.awaitCheckedOperation('kora_banking:' .. operationId(resource, key), expectedRequest)
     if not settled then return nil, 'unavailable', waitErr end
     if settled.active and settled.result and settled.result.code == 'indeterminate' then
         return nil, 'indeterminate', settled.result.message
@@ -76,7 +76,7 @@ local function receipt(resource, key, expectedRequest)
     if not value then return nil, 'unavailable', 'Stored banking receipt is invalid.' end
     local synced, syncErr = synchronize(resource, key)
     if not synced then return nil, 'pending', syncErr or 'Committed funds are awaiting player synchronization.' end
-    for _, account in ipairs(value.accounts or {}) do TriggerEvent('qbbanking:refreshAccount', account) end
+    for _, account in ipairs(value.accounts or {}) do TriggerEvent('kora_banking:refreshAccount', account) end
     return value
 end
 
@@ -163,7 +163,7 @@ local function execute(resource, key, request, fingerprint)
                 type(request.reason) == 'string' and request.reason:sub(1, 50) or 'Housing transaction' }, expectedRows = 1 }
     end
     for _, statement in ipairs(request.statements or {}) do statements[#statements + 1] = statement end
-    local outcome, transactionErr = Kora.sql.transactionChecked(statements, { key = 'qbbanking:' .. operationId(resource, key), fingerprint = fingerprint, citizenids = prepared.ids })
+    local outcome, transactionErr = Kora.sql.transactionChecked(statements, { key = 'kora_banking:' .. operationId(resource, key), fingerprint = fingerprint, citizenids = prepared.ids })
     if not outcome or not outcome.success then
         if outcome and outcome.code ~= 'indeterminate' then
             local found, foundCode, foundErr = receipt(resource, key, fingerprint)
@@ -189,7 +189,7 @@ exports('ExecuteTransaction', function(key, request)
     local result = table.pack(pcall(execute, resource, key, request, fingerprint))
     busy[identity] = nil
     if not result[1] then
-        print(('[qbbanking] durable operation failed for %s: %s'):format(resource, tostring(result[2])))
+        print(('[kora_banking] durable operation failed for %s: %s'):format(resource, tostring(result[2])))
         return nil, 'indeterminate', 'The transaction needs receipt reconciliation.'
     end
     return table.unpack(result, 2, result.n)
@@ -236,22 +236,22 @@ end
 local function bootstrap()
     local available = Kora.sql.ready(60000)
     if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
-    local migrated, err = Kora.sql.ensureTables(QBBankingSchema)
+    local migrated, err = Kora.sql.ensureTables(KoraBankingSchema)
     if not migrated then
-        print(('[qbbanking] durable banking schema setup failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
+        print(('[kora_banking] durable banking schema setup failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
         local retry = tonumber(Config.migrationRetrySeconds) or 0
         if retry > 0 then Kora.timers.setTimeout(bootstrap, retry * 1000) end
         return
     end
-    local settled, waitErr = Kora.sql.awaitCheckedOperations('qbcore:fence:qbbanking:')
+    local settled, waitErr = Kora.sql.awaitCheckedOperations('kora_core:fence:kora_banking:')
     if not settled then
-        print(('[qbbanking] player operation recovery deferred: %s'):format(tostring(waitErr)))
+        print(('[kora_banking] player operation recovery deferred: %s'):format(tostring(waitErr)))
         Kora.timers.setTimeout(bootstrap, 30000)
         return
     end
     recoverOperations()
     ready = true
-    TriggerEvent('qbbanking:durableReady')
+    TriggerEvent('kora_banking:durableReady')
 end
 
 AddEventHandler('onResourceStop', function(resource)
