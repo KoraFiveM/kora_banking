@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'kora_banking'
 author 'qbcore2'
-version '3.1.5'
+version '3.1.6'
 description 'Personal, shared, society and gang banking for Kora'
 
 provide 'qb-banking'
