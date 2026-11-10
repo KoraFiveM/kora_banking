@@ -320,7 +320,7 @@ local function nearAtm(src, location)
 end
 
 local function session(src, mode, unlocked, location)
-    Sessions[src] = { mode = mode, unlocked = unlocked == true, location = location, attempts = 0, expires = os.time() + 300 }
+    Sessions[src] = { mode = mode, unlocked = unlocked == true, location = location, expires = os.time() + 300 }
 end
 
 local function activeSession(src)
@@ -702,21 +702,29 @@ local function atmCardCallback(src, location)
     return true
 end
 
+-- Failed PIN entries and the lockout belong to the player, not the ATM session:
+-- the prompt promises "a temporary account lockout", so closing and reopening
+-- the machine must neither lift the lock nor reset the attempt count.
+local PinGuards = {}
+
 local function pinCallback(src, pin)
     local current = activeSession(src)
     if not current or current.mode ~= 'atm' then return nil, 'Open an ATM first.' end
-    if current.lockedUntil and current.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
+    local guard = PinGuards[src]
+    if not guard then guard = { attempts = 0 } PinGuards[src] = guard end
+    if guard.lockedUntil and guard.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
     if not hasBankCard(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
     local value = tostring(pin or '')
     if not value:match('^%d%d%d%d$') or not cardPins(src)[value] then
-        current.attempts = current.attempts + 1
-        if current.attempts >= 5 then
-            current.attempts = 0
-            current.lockedUntil = os.time() + 30
+        guard.attempts = guard.attempts + 1
+        if guard.attempts >= 5 then
+            guard.attempts = 0
+            guard.lockedUntil = os.time() + 30
             return nil, 'Too many attempts. Wait 30 seconds and try again.'
         end
         return nil, 'Incorrect PIN.'
     end
+    PinGuards[src] = nil
     current.unlocked = true
     return snapshot(src, 'atm', true)
 end
@@ -863,6 +871,7 @@ end)
 RegisterNetEvent('kora_banking:close', function() Sessions[source] = nil end)
 AddEventHandler('playerDropped', function()
     Sessions[source] = nil
+    PinGuards[source] = nil
 end)
 
 CreateThread(function()

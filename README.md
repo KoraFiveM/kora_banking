@@ -75,7 +75,8 @@ The resource name is `kora_banking`. It provides the legacy `qb-banking` identit
 
 `Config.transactionCallers` authorizes server resources (default `kora_housing`).
 `ExecuteTransaction(operationKey, request)` returns a confirmed receipt, or
-`nil, code, message`. `GetOperation(operationKey)` reads only the caller's receipt
+`false, code, message` (not `nil`: a leading nil would drop the code and message
+across the export boundary). `GetOperation(operationKey)` reads only the caller's receipt
 and completes any pending player/cache synchronization. Both yield.
 
 ```lua

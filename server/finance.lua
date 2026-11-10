@@ -176,7 +176,15 @@ local function execute(resource, key, request, fingerprint)
     return receipt(resource, key, fingerprint)
 end
 
-exports('ExecuteTransaction', function(key, request)
+-- Export results are msgpacked and a leading nil drops every later value, so a
+-- `nil, code, message` refusal reached other resources as a bare nil. Refusals
+-- leave the export as `false, code, message`; a receipt passes through unchanged.
+local function exported(first, ...)
+    if first == nil and select('#', ...) > 0 then return false, ... end
+    return first, ...
+end
+
+local function executeTransaction(key, request)
     local resource = caller()
     if not resource then return nil, 'rejected', 'This resource cannot execute durable banking operations.' end
     if not ready then return nil, 'unavailable', 'Durable banking is not ready.' end
@@ -193,9 +201,9 @@ exports('ExecuteTransaction', function(key, request)
         return nil, 'indeterminate', 'The transaction needs receipt reconciliation.'
     end
     return table.unpack(result, 2, result.n)
-end)
+end
 
-exports('GetOperation', function(key)
+local function getOperation(key)
     local resource = caller()
     if not resource then return nil, 'rejected', 'This resource cannot read banking operations.' end
     if not ready then return nil, 'unavailable', 'Durable banking is not ready.' end
@@ -203,7 +211,10 @@ exports('GetOperation', function(key)
     local result = table.pack(pcall(receipt, resource, key))
     if not result[1] then return nil, 'unavailable', 'Banking receipt lookup failed.' end
     return table.unpack(result, 2, result.n)
-end)
+end
+
+exports('ExecuteTransaction', function(key, request) return exported(executeTransaction(key, request)) end)
+exports('GetOperation', function(key) return exported(getOperation(key)) end)
 
 local function recoverOperations()
     recoveryTimer = nil

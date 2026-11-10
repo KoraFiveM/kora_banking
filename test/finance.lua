@@ -82,7 +82,7 @@ local function boot()
     end
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.json, env.Config, env.Kora = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
+    env.json, env.Config, env.Kora = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, util = { decodeJson = function(v) local ok, r = pcall(json.decode, v) return ok and r or nil end }, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
     env.exports = setmetatable({ kora_core = core }, { __call = function(_, name, fn) api[name] = fn end })
     env.GetInvokingResource = function() return caller end
     env.GetCurrentResourceName = function() return 'kora_banking' end
@@ -115,7 +115,8 @@ caller = 'other'
 receipt, code = api.GetOperation('sale:one')
 check(not receipt and code == 'not_found', 'Another resource must not read the receipt')
 caller = 'untrusted'
-check(api.ExecuteTransaction('forged', sale) == nil, 'Untrusted callers cannot execute')
+local forged, forgedCode = api.ExecuteTransaction('forged', sale)
+check(forged == false and forgedCode == 'rejected', 'Untrusted callers cannot execute, and the refusal keeps its code across exports')
 caller = 'kora_housing'
 
 local rent = { debits = { { citizenid = 'BUYER', amount = 10000 } }, credits = { { citizenid = 'SELLER', amount = 10000 } } }
@@ -143,21 +144,21 @@ receipt = api.GetOperation('deposit:reserve')
 check(receipt and receipt.status == 'completed' and next(locks) == nil, 'Provider restart must recover the original receipt and fence')
 check(memory.BUYER.bank == 8500 and cache.escrow == 500, 'Receipt recovery publishes committed balances')
 previousAttempts = attempts
-check(api.ExecuteTransaction('deposit:reserve', copy(reserve)) ~= nil and attempts == previousAttempts, 'Restarted duplicate must not reserve twice')
+check(api.ExecuteTransaction('deposit:reserve', copy(reserve)) and attempts == previousAttempts, 'Restarted duplicate must not reserve twice')
 local refund = { debits = { { account = 'escrow', amount = 500 } }, credits = { { citizenid = 'BUYER', amount = 500 } } }
-check(api.ExecuteTransaction('deposit:refund', refund) ~= nil, 'Escrow refund must settle')
+check(api.ExecuteTransaction('deposit:refund', refund), 'Escrow refund must settle')
 check(database.accounts.escrow == 0 and database.players.BUYER.bank == 9000, 'Escrow refund must conserve funds')
 f.failFinish = true
 receipt, code = api.ExecuteTransaction('publish:pending', reserve)
 check(not receipt and code == 'pending' and next(locks) ~= nil, 'Confirmed commit with failed publication must remain pending')
 f.failFinish = false
-check(api.GetOperation('publish:pending') ~= nil and next(locks) == nil, 'Receipt retry must release only after publication succeeds')
+check(api.GetOperation('publish:pending') and next(locks) == nil, 'Receipt retry must release only after publication succeeds')
 local netted = { debits = { { citizenid = 'BUYER', amount = 1000000 } }, credits = { { citizenid = 'BUYER', amount = 1000000 } } }
 receipt, code = api.ExecuteTransaction('gross:not-net', netted)
 check(not receipt and code == 'insufficient_funds', 'A same-account credit cannot net away the required gross debit')
 database.players.SELLER.bank = -100
 local income = { debits = { { citizenid = 'BUYER', amount = 20 } }, credits = { { citizenid = 'SELLER', amount = 20 } } }
-check(api.ExecuteTransaction('credit:negative-recipient', income) ~= nil and database.players.SELLER.bank == -80, 'Credit-only legs still pay a recipient with an existing allowed negative balance')
+check(api.ExecuteTransaction('credit:negative-recipient', income) and database.players.SELLER.bank == -80, 'Credit-only legs still pay a recipient with an existing allowed negative balance')
 f.outage = true
 receipt, code = api.ExecuteTransaction('rent:outage', reserve)
 check(not receipt and code == 'unavailable', 'An outage cannot be classified as insufficient funds')
