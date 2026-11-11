@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+lua test/client.lua
+lua test/contracts.lua
+lua test/server.lua
+lua test/finance.lua
+lua test/dates.lua
+lua test/minamount.lua
+lua test/minamount_docs.lua
+lua test/migrations.lua
+lua test/tiers.lua
+lua test/tiers_docs.lua
+lua test/transfers.lua
