@@ -156,3 +156,5 @@ the `transfer` feature) still apply.
 
 Card numbers are looked up in stored inventories, so a card that was only just ordered resolves after the issuing
 character's inventory has been saved.
+
+Full documentation: see [docs/](docs/index.md).
