@@ -1,0 +1,61 @@
+{
+  "resource": "kora_banking",
+  "standardsRevision": "2026-11-12.1",
+  "realms": {
+    "client": [
+      "client.lua"
+    ],
+    "server": [
+      "server.lua",
+      "server/finance.lua",
+      "server/schema.lua"
+    ],
+    "shared": [
+      "config.lua",
+      "dates.lua",
+      "locales/de.lua",
+      "locales/en.lua",
+      "locales/es.lua",
+      "locales/it.lua",
+      "locales/nl.lua",
+      "tiers.lua"
+    ],
+    "manifest": [
+      "fxmanifest.lua"
+    ],
+    "test": [
+      "test/client.lua",
+      "test/contracts.lua",
+      "test/dates.lua",
+      "test/finance.lua",
+      "test/migrations.lua",
+      "test/minamount.lua",
+      "test/minamount_docs.lua",
+      "test/server.lua",
+      "test/tiers.lua",
+      "test/tiers_docs.lua",
+      "test/transfers.lua"
+    ]
+  },
+  "exclude": [
+    ".git/*",
+    ".github/*",
+    ".standards/*",
+    "node_modules/*",
+    "**/node_modules/*",
+    "vendor/*",
+    "**/vendor/*",
+    "web/*",
+    "ui/*",
+    "html/*",
+    "dist/*",
+    "artifacts/*",
+    "runtime/*",
+    "txData/*",
+    "storage/*",
+    "stream/*",
+    "docs/*",
+    "__pycache__/*",
+    "modules/lookup/data/*"
+  ]
+}

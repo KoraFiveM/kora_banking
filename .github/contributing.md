@@ -1,3 +1,7 @@
+> For Kora code style, architecture, local checks and review requirements, follow
+> [Contributing to Kora](../CONTRIBUTING.md). The QBCore guide below is retained
+> as historical contribution context; the Kora guide defines current coding standards.
+
 # Contributing to QBCore
 
 First of all, thank you for taking the time to contribute!
