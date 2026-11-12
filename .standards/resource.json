@@ -1,6 +1,6 @@
 {
   "resource": "kora_banking",
-  "standardsRevision": "2026-11-12.1",
+  "standardsRevision": "2026-11-12.2",
   "realms": {
     "client": [
       "client.lua"
@@ -57,5 +57,7 @@
     "docs/*",
     "__pycache__/*",
     "modules/lookup/data/*"
-  ]
+  ],
+  "project": "Kora Framework",
+  "copyright": "Copyright © 2026 Kora Framework"
 }
