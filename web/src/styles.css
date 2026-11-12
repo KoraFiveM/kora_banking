@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { width: 100vw; height: 100vh; margin: 0; overflow: hidden; background: transparent !important; pointer-events: none; }
+  h1, h2, h3 { @apply font-heading; }
+}
+
+@layer components {
+  .app-surface { @apply pointer-events-auto overflow-hidden rounded-xl border border-border bg-background shadow-modal; }
+  .button { @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45; }
+  .button-primary { @apply button bg-primary text-primary-foreground hover:bg-brand-hover; }
+  .button-secondary { @apply button border border-border bg-secondary text-secondary-foreground hover:bg-surface-hover; }
+  .button-ghost { @apply button text-muted-foreground hover:bg-surface-hover hover:text-foreground; }
+  .button-danger { @apply button border border-destructive/45 bg-destructive/10 text-foreground hover:bg-destructive/20; }
+  .field { @apply h-10 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring; }
+  .label { @apply mb-1.5 block text-xs font-medium text-muted-foreground; }
+  .card { @apply rounded-lg border border-border bg-card; }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; } }
