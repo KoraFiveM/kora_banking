@@ -5,7 +5,7 @@ sidebar_position: 1
 
 # Bank branches
 
-Every entry in `Config.locations` gets a kora_target sphere zone (radius 1.2 m, interaction distance 1.8 m) and a map marker. The target option reads `Open bank`. When [tiers](./bank-tiers.md) are enabled, it reads `Open <label>` (for example `Open Pacific Standard`).
+Every entry in `Config.locations` gets a kora_target sphere zone (radius 1.2 m, interaction distance 1.8 m) and a map marker. The target option reads `Open bank`. When [tiers](../api/tiers.md) are enabled, it reads `Open <label>` (for example `Open Pacific Standard`).
 
 ## Opening a branch
 
@@ -40,7 +40,7 @@ The app (kora_lib AppShell id `kora_banking:bank`) opens in the standard layout.
 - If a step fails after money has moved, the server rolls it back (for example cash is returned if the account cannot be credited).
 - Every successful deposit, withdrawal and transfer writes rows to `bank_statements`.
 - One player's actions are processed one at a time. An overlapping request gets "Your previous banking request is still being processed."
-- With tiers enabled, the tier's feature gates, the daily counter withdrawal cap and the maximum transfer apply. See [Bank tiers](./bank-tiers.md).
+- With tiers enabled, the tier's feature gates, the daily counter withdrawal cap and the maximum transfer apply. See [Bank tiers](../api/tiers.md).
 
 ## Ordering a bank card
 

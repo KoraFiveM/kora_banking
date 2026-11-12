@@ -5,7 +5,7 @@ sidebar_position: 3
 
 # ATMs and bank cards
 
-ATMs give quick access to the **personal account only**. They support cash withdrawal and deposit. Transfers, shared accounts and account management are only available at a branch. ATMs have no [tier](./bank-tiers.md).
+ATMs give quick access to the **personal account only**. They support cash withdrawal and deposit. Transfers, shared accounts and account management are only available at a branch. ATMs have no [tier](../api/tiers.md).
 
 ## Finding an ATM
 

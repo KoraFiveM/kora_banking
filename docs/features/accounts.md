@@ -22,7 +22,7 @@ Anyone who can use an account can deposit into it, withdraw from it and transfer
 
 - At startup the resource loads all `bank_accounts` rows into memory. It then creates a zero-balance `job` account for every job in kora_core shared jobs (except `unemployed`) and a `gang` account for every gang (except `none`) that has no account yet.
 - When a boss opens a branch, a missing account for their current job or gang is created on the fly.
-- Other resources can create accounts with `CreateJobAccount` / `CreateGangAccount` and move money with `AddMoney` / `RemoveMoney`. See [Exports](../exports.md).
+- Other resources can create accounts with `CreateJobAccount` / `CreateGangAccount` and move money with `AddMoney` / `RemoveMoney`. See [Exports](../api/exports.md).
 
 ## Shared accounts
 

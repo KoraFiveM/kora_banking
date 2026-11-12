@@ -14,53 +14,24 @@ kora_banking is the Kora banking resource. It gives every character a personal b
 - **ATMs**: model targets on `Config.atmModels`, fallback sphere zones at `Config.atmCoords`, a card animation and progress bar, a 4-digit PIN keypad with lockout, and an optional daily allowance. ATMs serve the personal account only. See [ATMs and bank cards](./features/atms.md).
 - **Bank cards**: the `bank_card` item is issued at a branch and bound to the character who ordered it. Using the item opens a nearby ATM. See [Items](./items.md).
 - **Transfers**: transfers between your own accounts, and transfers to a citizen ID (online or offline), to a shared/society/gang account name or to a bank card number. See [Transfers](./features/transfers.md).
-- **Bank tiers (optional)**: Fleeca Bank and Pacific Standard presets with per-tier feature gates, a daily counter withdrawal cap and a maximum single transfer. They are off by default. See [Bank tiers](./features/bank-tiers.md).
+- **Bank tiers (optional)**: Fleeca Bank and Pacific Standard presets with per-tier feature gates, a daily counter withdrawal cap and a maximum single transfer. They are off by default. See [Bank tiers](./api/tiers.md).
 - **Transaction history**: the last 50 rows per account from `bank_statements` and from the durable ledger. Date format, time display and time zone are configurable.
 - **Map markers**: grouped `Bank` blips created through kora_lib, with optional per-tier icons.
 - **Durable resource transactions**: `ExecuteTransaction` / `GetOperation` for allow-listed server resources. They provide balanced debit/credit legs, caller-supplied SQL in the same database transaction, and idempotent receipts. See [Durable transactions](./features/durable-transactions.md).
 - **`/givecash` command**: hand cash to a nearby player. See [Commands](./commands.md).
 - **Legacy compatibility**: it provides `qb-banking`, the `qb-banking` export names and the `qb-banking:client:useCard` event. See [Compatibility](./compatibility.md).
 
-## Requirements
+## Requirements and installation
 
-Declared in `fxmanifest.lua`:
+The resource needs kora_theme, kora_lib, kora_sql, kora_core, kora_target and kora_inventory. See [Installation](./installation.md) for the requirements table, `server.cfg` order and first-start behaviour.
 
-| Resource | Used for |
-| --- | --- |
-| [kora_theme](https://github.com/KoraFiveM/kora_theme) | Shared palette consumed by the kora_lib AppShell frame (must start first) |
-| [kora_lib](https://github.com/KoraFiveM/kora_lib) | AppShell UI, callbacks, notifications, progress bar, blips, config editor, timers, utilities |
-| [kora_sql](https://github.com/KoraFiveM/kora_sql) | Database access, schema creation (`Kora.sql.ensureTables`), checked transactions |
-| [kora_core](https://github.com/KoraFiveM/kora_core) | Player data, money, items, useable items, commands, jobs/gangs, player-column operation locks |
-| [kora_target](https://github.com/KoraFiveM/kora_target) | Branch sphere zones, ATM model targets and ATM fallback zones |
-| [kora_inventory](https://github.com/KoraFiveM/kora_inventory) | Holds the `bank_card` item |
+## Documentation map
 
-The durable transaction API needs kora_sql, kora_core and kora_banking versions that match each other. Deploy them together.
-
-## Installation
-
-1. Put `kora_banking` in your resources folder.
-2. Ensure it after its dependencies in `server.cfg`:
-
-   ```cfg
-   ensure kora_theme
-   ensure kora_lib
-   ensure kora_sql
-   ensure kora_core
-   ensure kora_target
-   ensure kora_inventory
-   ensure kora_banking
-   ```
-
-3. **SQL**: nothing to import by hand. On start the resource creates or extends `bank_accounts`, `bank_statements`, `bank_operations` and `bank_operation_legs` through `Kora.sql.ensureTables`. See [Database](./database.md).
-4. **Items**: the `bank_card` item is registered at runtime in kora_core's shared items if it does not already exist. You only need an `id_card.png` image in your inventory images. See [Items](./items.md).
-5. Society accounts are created at startup for every job (except `unemployed`), and gang accounts for every gang (except `none`).
-
-## Documentation
-
-- [Configuration](./configuration.md)
-- Features: [Bank branches](./features/bank-branches.md), [Accounts](./features/accounts.md), [ATMs and bank cards](./features/atms.md), [Transfers](./features/transfers.md), [Bank tiers](./features/bank-tiers.md), [Durable transactions](./features/durable-transactions.md)
-- [Commands](./commands.md)
-- [Exports](./exports.md)
+- [Installation](./installation.md): setup steps, manifest reference and requirements
+- [How to use](./how-to-use.md): player walkthrough, architecture and how money is validated
+- [Commands](./commands.md): `/givecash`
+- API reference: [overview](./api/index.md), [Public exports](./api/exports.md), [Configuration](./api/configuration.md), [Bank tiers](./api/tiers.md), [Security and integrity](./api/security.md)
+- Features: [Bank branches](./features/bank-branches.md), [Accounts](./features/accounts.md), [ATMs and bank cards](./features/atms.md), [Transfers](./features/transfers.md), [Durable transactions](./features/durable-transactions.md)
 - [Events](./events.md)
 - [Database](./database.md)
 - [Items](./items.md)
