@@ -3,7 +3,7 @@ on: [push, pull_request_target]
 jobs:
   lint:
     name: Lint Resource
-    runs-on: ubuntu-latest
+    runs-on: kora-vps
     steps:
       - uses: actions/checkout@v2
         with:
