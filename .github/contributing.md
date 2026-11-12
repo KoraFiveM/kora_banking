@@ -1,3 +1,8 @@
+> For Kora Framework code style, architecture, local checks and review requirements, follow
+> [Contributing to Kora Framework](../CONTRIBUTING.md). The QBCore guide below is retained
+> as historical contribution context; the Kora Framework guide defines current coding standards.
+> Copyright © 2026 Kora Framework (Kora Framework contribution guidance).
+
 # Contributing to QBCore
 
 First of all, thank you for taking the time to contribute!
