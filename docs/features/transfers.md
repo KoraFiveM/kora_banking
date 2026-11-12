@@ -33,4 +33,4 @@ Card numbers are looked up in saved inventories. A card that was just ordered on
 
 - `Config.minAmount.transfer` (default 1).
 - With tiers enabled, the `transfer` feature gate and the tier's `limits.maxTransfer` apply. If the amount is too large, the error names the first tier (alphabetical by tier key) with a higher limit.
-- No per-day transfer total is tracked. Outgoing transfers from the personal account do count toward the ATM daily allowance and the tier counter cap, because they are recorded as `withdraw` statements. See [Bank tiers](./bank-tiers.md#daily-counter-cap).
+- No per-day transfer total is tracked. Outgoing transfers from the personal account do count toward the ATM daily allowance and the tier counter cap, because they are recorded as `withdraw` statements. See [Bank tiers](../api/tiers.md#daily-counter-cap).

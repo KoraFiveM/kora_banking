@@ -4,7 +4,7 @@ kora_banking is the Kora FiveM banking resource: personal, shared, society and g
 
 ## Documentation
 
-User-facing documentation lives in `docs/` (Markdown, published via the Kora Docusaurus site, kora_docs_next). Read `docs/index.md` first for an overview of features, configuration, commands, exports, events and database usage.
+User-facing documentation lives in `docs/` (Markdown, published via the Kora Docusaurus site, kora_docs_next). Read `docs/index.md` first; it has the documentation map. Layout: `index.md` (overview and map), `installation.md` (setup, manifest, requirements), `how-to-use.md` (player walkthrough, architecture, money validation), `commands.md` (`/givecash`), `api/` (`exports.md` public exports, `configuration.md` every `Config` option, `tiers.md` bank tiers and `BankingTiers` helpers, `security.md` protections and limits), `features/` (branches, accounts, ATMs, transfers, durable transactions), and topic pages `events.md`, `database.md`, `items.md`, `compatibility.md`, `troubleshooting.md`. Change the page that owns the topic: exports and their errors in `api/exports.md`, options and defaults in `api/configuration.md`.
 
 When you add, change, or remove a feature, config option, command, export, event, item, permission, or database table/column, update the matching page in `docs/` in the same change. Keep docs accurate to the code; do not document behaviour that does not exist.
 

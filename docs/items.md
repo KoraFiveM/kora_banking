@@ -1,6 +1,6 @@
 ---
 title: Items
-sidebar_position: 8
+sidebar_position: 9
 ---
 
 # Items
