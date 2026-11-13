@@ -6,14 +6,14 @@ AddEventHandler('kora_banking:durableReady', function() durableHistory = true en
 
 if not Kora.shared.get('items', 'bank_card') then
     local itemRegistered, itemError = Kora.shared.register('items', 'bank_card', {
-        label = 'Bank Card',
+        label = Kora.lang('ui.bank_card'),
         weight = 0,
         type = 'item',
         image = 'id_card.png',
         unique = true,
         useable = true,
         shouldClose = true,
-        description = 'A personal debit card used to access ATMs.',
+        description = Kora.lang('ui.bank_card_description'),
     })
     if not itemRegistered then
         print(('^1[kora_banking]^7 bank card registration failed: %s'):format(itemError or 'unknown error'))
@@ -44,7 +44,7 @@ end
 
 local function belowMinimum(kind, amount)
     local minimum = minimumAmount(kind)
-    if amount < minimum then return ('Minimum %s is $%d.'):format(MIN_LABELS[kind], minimum) end
+    if amount < minimum then return Kora.lang('error.minimum_amount', Kora.lang('ui.' .. MIN_LABELS[kind]), minimum) end
 end
 
 local function cleanText(value, fallback, maxLength)
@@ -56,14 +56,14 @@ end
 
 local function validAccountName(raw)
     local name = cleanText(raw, nil, 40)
-    if not name or #name < 3 then return nil, 'Account names need at least 3 characters.' end
-    if not name:match('^[%w][%w _%-]+$') then return nil, 'Use letters, numbers, spaces, dashes or underscores.' end
+    if not name or #name < 3 then return nil, Kora.lang('error.name_short') end
+    if not name:match('^[%w][%w _%-]+$') then return nil, Kora.lang('error.name_characters') end
     return name
 end
 
 local function player(src)
     local data = exports.kora_core:getPlayerData(src)
-    if not data then return nil, 'Player data is unavailable.' end
+    if not data then return nil, Kora.lang('error.player_unavailable') end
     return data
 end
 
@@ -306,7 +306,7 @@ end
 -- Returns an error message when the branch's tier blocks the feature (always nil while tiers are disabled).
 local function tierBlocks(branch, feature, what)
     if BankingTiers.can(branch, feature) then return nil end
-    return ('%s is only available at %s.'):format(what, BankingTiers.availableAt(feature) or 'another branch')
+    return Kora.lang('error.feature_available', what, BankingTiers.availableAt(feature) or Kora.lang('ui.another_branch'))
 end
 
 local function nearAtm(src, location)
@@ -361,7 +361,7 @@ cardRows = function(src)
     for _, item in pairs(exports.kora_core:getItemsByName(src, 'bank_card') or {}) do
         local info = item.info or {}
         local number = tostring(info.cardNumber or '')
-        rows[#rows + 1] = { name = info.name or 'Bank card', number = #number >= 4 and ('**** %s'):format(number:sub(-4)) or 'Issued card' }
+        rows[#rows + 1] = { name = info.name or Kora.lang('ui.bank_card'), number = #number >= 4 and ('**** %s'):format(number:sub(-4)) or Kora.lang('ui.issued_card') }
     end
     return rows
 end
@@ -398,11 +398,11 @@ end
 
 local function transactCash(src, data, current, payload)
     local amount = roundAmount(payload.amount)
-    if not amount then return nil, 'Enter a valid amount.' end
+    if not amount then return nil, Kora.lang('error.valid_amount') end
     local account = sourceAccount(data, payload.account)
-    if not account then return nil, 'You cannot use that account.' end
-    if current.mode == 'atm' and account.account_name ~= 'checking' then return nil, 'ATMs only support your personal account.' end
-    local reason = cleanText(payload.reason, payload.kind == 'deposit' and 'Cash deposit' or 'Cash withdrawal', 50)
+    if not account then return nil, Kora.lang('error.account_unavailable') end
+    if current.mode == 'atm' and account.account_name ~= 'checking' then return nil, Kora.lang('error.atm_personal_only') end
+    local reason = cleanText(payload.reason, payload.kind == 'deposit' and Kora.lang('ui.cash_deposit') or Kora.lang('ui.cash_withdrawal'), 50)
     local tooSmall = belowMinimum(payload.kind == 'deposit' and 'deposit' or 'withdraw', amount)
     if tooSmall then return nil, tooSmall end
     local blocked = payload.kind == 'deposit' and tierBlocks(current.branch, 'deposit', 'Depositing cash')
@@ -410,30 +410,30 @@ local function transactCash(src, data, current, payload)
     if blocked then return nil, blocked end
 
     if payload.kind == 'deposit' then
-        if (tonumber(data.money.cash) or 0) < amount then return nil, 'You do not have that much cash.' end
-        if not exports.kora_core:removeMoney(src, 'cash', amount, reason, true) then return nil, 'The cash could not be deposited.' end
+        if (tonumber(data.money.cash) or 0) < amount then return nil, Kora.lang('error.cash_short') end
+        if not exports.kora_core:removeMoney(src, 'cash', amount, reason, true) then return nil, Kora.lang('error.deposit_failed') end
         if not credit(src, account, amount, reason) then
             exports.kora_core:addMoney(src, 'cash', amount, 'bank deposit rollback', true)
-            return nil, 'The account could not be credited.'
+            return nil, Kora.lang('error.credit_failed')
         end
         statement(src, account.account_name, amount, reason, 'deposit')
-        return ('Deposited $%s.'):format(amount)
+        return Kora.lang('success.deposited_amount', amount)
     end
 
     if current.mode == 'atm' and Config.useDailyLimit and amount > dailyWithdrawalRemaining(data) then
-        return nil, 'Above the limit of what you may withdraw at this ATM.'
+        return nil, Kora.lang('error.atm_withdraw_limit')
     end
     local counterCap = current.mode == 'bank' and BankingTiers.limit(current.branch, 'dailyWithdraw') or nil
     if counterCap and amount > dailyWithdrawalRemaining(data, counterCap) then
-        return nil, ('Above the daily withdrawal limit of $%d at %s.'):format(counterCap, current.branch.label or 'this bank')
+        return nil, Kora.lang('error.daily_limit', counterCap, current.branch.label or 'this bank')
     end
-    if not debit(src, data, account, amount, reason) then return nil, 'That account does not have enough money.' end
+    if not debit(src, data, account, amount, reason) then return nil, Kora.lang('error.insufficient_account') end
     if not exports.kora_core:addMoney(src, 'cash', amount, reason, true) then
         credit(src, account, amount, 'bank withdrawal rollback')
-        return nil, 'The cash could not be issued.'
+        return nil, Kora.lang('error.cash_issue_failed')
     end
     statement(src, account.account_name, amount, reason, 'withdraw')
-    return ('Withdrew $%s.'):format(amount)
+    return Kora.lang('success.withdrew_amount', amount)
 end
 
 local function transferSettings()
@@ -497,7 +497,7 @@ end
 -- Debits `from`, then runs `creditDestination`; a failure at either step rolls the debit back.
 -- Shared by every transfer() branch below -- only how the destination is credited differs.
 local function moveFunds(src, data, from, amount, reason, creditDestination, creditFailureMessage)
-    if not debit(src, data, from, amount, reason) then return nil, 'The source account does not have enough money.' end
+    if not debit(src, data, from, amount, reason) then return nil, Kora.lang('error.insufficient_source') end
     if not creditDestination() then
         credit(src, from, amount, 'transfer rollback')
         return nil, creditFailureMessage
@@ -507,9 +507,9 @@ end
 
 local function transfer(src, data, payload, branch)
     local amount = roundAmount(payload.amount)
-    if not amount then return nil, 'Enter a valid amount.' end
+    if not amount then return nil, Kora.lang('error.valid_amount') end
     local from = sourceAccount(data, payload.from)
-    if not from then return nil, 'You cannot use the source account.' end
+    if not from then return nil, Kora.lang('error.source_account') end
     local reason = cleanText(payload.reason, 'Bank transfer', 50)
     local tooSmall = belowMinimum('transfer', amount)
     if tooSmall then return nil, tooSmall end
@@ -518,59 +518,59 @@ local function transfer(src, data, payload, branch)
     local maxTransfer = BankingTiers.limit(branch, 'maxTransfer')
     if maxTransfer and amount > maxTransfer then
         local higher = BankingTiers.higherLimitAt('maxTransfer', maxTransfer)
-        return nil, ('Transfers above $%d%s.'):format(maxTransfer, higher and (' are only available at ' .. higher) or ' are not allowed here')
+        return nil, Kora.lang('error.transfer_over_limit', maxTransfer, higher and Kora.lang('error.transfer_only_at', higher) or Kora.lang('error.transfer_not_allowed'))
     end
 
     if payload.to then
         local destination = sourceAccount(data, payload.to)
-        if not destination then return nil, 'You cannot use the destination account.' end
-        if destination.account_name == from.account_name then return nil, 'Choose two different accounts.' end
+        if not destination then return nil, Kora.lang('error.destination_account') end
+        if destination.account_name == from.account_name then return nil, Kora.lang('error.different_accounts') end
         local ok, err = moveFunds(src, data, from, amount, reason,
             function() return credit(src, destination, amount, reason) end,
-            'The destination account could not be credited.')
+            Kora.lang('error.destination_credit_failed'))
         if not ok then return nil, err end
         statement(src, from.account_name, amount, reason, 'withdraw')
         statement(src, destination.account_name, amount, reason, 'deposit')
-        return ('Transferred $%s.'):format(amount)
+        return Kora.lang('success.transferred_amount', amount)
     end
 
     local ref = cleanText(payload.recipient, nil, 50)
-    if not ref then return nil, 'Enter an account number.' end
+    if not ref then return nil, Kora.lang('error.account_number') end
     ref = ref:gsub('^%s+', ''):gsub('%s+$', ''):gsub('^(%d%d%d%d)[ %-](%d%d%d%d)[ %-](%d%d%d%d)[ %-](%d%d%d%d)$', '%1%2%3%4')
     local settings = transferSettings()
     local target = resolveRecipient(ref, settings)
     if not target then
-        return nil, settings.allowOffline and 'No account was found with that number.' or 'That account holder must be online.'
+        return nil, settings.allowOffline and Kora.lang('error.recipient_missing') or Kora.lang('error.recipient_online')
     end
 
     if target.kind == 'account' then
         local name = target.account.account_name
-        if name == from.account_name then return nil, 'Choose two different accounts.' end
+        if name == from.account_name then return nil, Kora.lang('error.different_accounts') end
         local ok, err = moveFunds(src, data, from, amount, reason,
             function() return credit(src, target.account, amount, reason) end,
-            'The recipient could not be credited.')
+            Kora.lang('error.recipient_credit_failed'))
         if not ok then return nil, err end
         statement(src, from.account_name, amount, reason, 'withdraw')
         statement(src, name, amount, reason, 'deposit')
-        return ('Sent $%s.'):format(amount)
+        return Kora.lang('success.sent_amount', amount)
     end
 
     local citizenid = target.citizenid
-    if citizenid == data.citizenid then return nil, 'Use an internal transfer for your own accounts.' end
+    if citizenid == data.citizenid then return nil, Kora.lang('error.own_transfer') end
     -- The holder may have logged in since the lookup; re-check so an online player is credited through their player object.
     local online = target.source and target or exports.kora_core:getPlayerByCitizenId(citizenid)
     local recipientSource = online and online.source or nil
-    if not recipientSource and not settings.allowOffline then return nil, 'That account holder must be online.' end
+    if not recipientSource and not settings.allowOffline then return nil, Kora.lang('error.recipient_online') end
     local ok, err = moveFunds(src, data, from, amount, reason,
         function()
             if recipientSource then return exports.kora_core:addMoney(recipientSource, 'bank', amount, reason, true) end
             return creditOffline(citizenid, amount)
         end,
-        'The recipient could not be credited.')
+        Kora.lang('error.recipient_credit_failed'))
     if not ok then return nil, err end
     statement(src, from.account_name, amount, reason, 'withdraw')
     statement(recipientSource, 'checking', amount, reason, 'deposit', citizenid)
-    return ('Sent $%s.'):format(amount)
+    return Kora.lang('success.sent_amount', amount)
 end
 
 local MANAGE_FEATURES = {
@@ -588,7 +588,7 @@ local function manage(src, data, payload, branch)
     if blocked then return nil, blocked end
     if payload.kind == 'orderCard' then
         local pin = tostring(payload.pin or '')
-        if not pin:match('^%d%d%d%d$') then return nil, 'Choose a 4-digit PIN.' end
+        if not pin:match('^%d%d%d%d$') then return nil, Kora.lang('error.pin_format') end
         local info = data.charinfo or {}
         local added = exports.kora_core:addItem(src, 'bank_card', 1, nil, {
             citizenid = data.citizenid,
@@ -596,55 +596,55 @@ local function manage(src, data, payload, branch)
             cardNumber = tostring(math.random(10000000, 99999999)) .. tostring(math.random(10000000, 99999999)),
             cardPin = tonumber(pin),
         }, 'kora_banking:order-card')
-        if not added then return nil, 'There is no room for a bank card.' end
-        return 'Bank card issued.'
+        if not added then return nil, Kora.lang('error.card_space') end
+        return Kora.lang('success.card_issued')
     end
 
     if payload.kind == 'create' then
-        if tonumber(payload.amount) == 0 then return nil, 'You can not open a shared account with $0' end
+        if tonumber(payload.amount) == 0 then return nil, Kora.lang('error.zero_shared') end
         local amount = roundAmount(payload.amount)
         local name, nameErr = validAccountName(payload.name)
         if not name then return nil, nameErr end
-        if not amount then return nil, 'Enter an opening balance.' end
+        if not amount then return nil, Kora.lang('error.opening_balance') end
         local count = 0
         for _, account in pairs(Accounts) do if account.citizenid == data.citizenid then count = count + 1 end end
-        if count >= Config.maxAccounts then return nil, ('You can own up to %d shared accounts.'):format(Config.maxAccounts) end
-        if Accounts[name] then return nil, 'That account name is already in use.' end
-        if (tonumber(data.money.bank) or 0) < amount then return nil, 'Your personal account does not have enough money.' end
-        if not exports.kora_core:removeMoney(src, 'bank', amount, 'Open shared account', true) then return nil, 'The opening balance could not be withdrawn.' end
+        if count >= Config.maxAccounts then return nil, Kora.lang('error.max_shared', Config.maxAccounts) end
+        if Accounts[name] then return nil, Kora.lang('error.name_in_use') end
+        if (tonumber(data.money.bank) or 0) < amount then return nil, Kora.lang('error.personal_insufficient') end
+        if not exports.kora_core:removeMoney(src, 'bank', amount, Kora.lang('ui.create_shared_action'), true) then return nil, Kora.lang('error.opening_withdraw') end
         if not createAccount(name, amount, 'shared', data.citizenid, '[]') then
             exports.kora_core:addMoney(src, 'bank', amount, 'account creation rollback', true)
-            return nil, 'The shared account could not be created.'
+            return nil, Kora.lang('error.shared_create')
         end
-        statement(src, 'checking', amount, 'Opened ' .. name, 'withdraw')
-        statement(src, name, amount, 'Opening balance', 'deposit')
-        return 'Shared account created.'
+        statement(src, 'checking', amount, Kora.lang('ui.opened_account', name), 'withdraw')
+        statement(src, name, amount, Kora.lang('ui.opening_balance_reason'), 'deposit')
+        return Kora.lang('success.shared_created')
     end
 
     local account = Accounts[payload.account]
     if not account or account.account_type ~= 'shared' or account.citizenid ~= data.citizenid then
-        return nil, 'Only the account owner can make that change.'
+        return nil, Kora.lang('error.owner_only')
     end
     if payload.kind == 'rename' then
         local name = validAccountName(payload.name)
-        if not name then return nil, 'Enter a valid account name.' end
-        if Accounts[name] then return nil, 'That account name is already in use.' end
+        if not name then return nil, Kora.lang('error.valid_name') end
+        if Accounts[name] then return nil, Kora.lang('error.name_in_use') end
         local changed = Kora.sql.update('UPDATE bank_accounts SET account_name = ? WHERE account_name = ? AND citizenid = ?', { name, account.account_name, data.citizenid })
-        if not applied(changed) then return nil, 'The account could not be renamed.' end
+        if not applied(changed) then return nil, Kora.lang('error.rename_failed') end
         Kora.sql.update('UPDATE bank_statements SET account_name = ? WHERE account_name = ?', { name, account.account_name })
         Accounts[account.account_name] = nil
         refreshAccount(name)
-        return 'Shared account renamed.'
+        return Kora.lang('success.shared_renamed')
     elseif payload.kind == 'delete' then
-        if tonumber(account.account_balance) ~= 0 then return nil, 'Move the remaining balance before closing this account.' end
+        if tonumber(account.account_balance) ~= 0 then return nil, Kora.lang('error.close_balance') end
         local changed = Kora.sql.update('DELETE FROM bank_accounts WHERE account_name = ? AND citizenid = ?', { account.account_name, data.citizenid })
-        if not applied(changed) then return nil, 'The account could not be closed.' end
+        if not applied(changed) then return nil, Kora.lang('error.close_failed') end
         Accounts[account.account_name] = nil
-        return 'Shared account closed.'
+        return Kora.lang('success.shared_closed')
     elseif payload.kind == 'addMember' or payload.kind == 'removeMember' then
-        if not consumeMemberRequest(src) then return nil, 'Wait before changing account access again.' end
+        if not consumeMemberRequest(src) then return nil, Kora.lang('error.access_rate') end
         local citizenid = cleanText(payload.citizenid, nil, 16)
-        if not citizenid then return nil, 'Enter a citizen ID.' end
+        if not citizenid then return nil, Kora.lang('error.citizen_id') end
         local list, found = users(account), false
         for index = #list, 1, -1 do
             if list[index] == citizenid then
@@ -653,36 +653,36 @@ local function manage(src, data, payload, branch)
             end
         end
         if payload.kind == 'addMember' then
-            if found then return nil, 'That person already has access.' end
+            if found then return nil, Kora.lang('error.already_access') end
             if #list >= Config.maxSharedMembers then
-                return nil, ('Shared accounts support up to %d members.'):format(Config.maxSharedMembers)
+                return nil, Kora.lang('error.max_members', Config.maxSharedMembers)
             end
             if not Kora.sql.scalar('SELECT citizenid FROM players WHERE citizenid = ? LIMIT 1', { citizenid }) then
-                return nil, 'No character has that citizen ID.'
+                return nil, Kora.lang('error.no_character')
             end
             list[#list + 1] = citizenid
-        elseif not found then return nil, 'That person does not have access.' end
+        elseif not found then return nil, Kora.lang('error.no_access') end
         local encoded = json.encode(list)
-        if #encoded > Config.maxSharedMemberBytes then return nil, 'The account access list is too large.' end
+        if #encoded > Config.maxSharedMemberBytes then return nil, Kora.lang('error.access_list_large') end
         local changed = Kora.sql.update('UPDATE bank_accounts SET users = ? WHERE account_name = ? AND citizenid = ?', { encoded, account.account_name, data.citizenid })
-        if not applied(changed) then return nil, 'Account access could not be updated.' end
+        if not applied(changed) then return nil, Kora.lang('error.access_update') end
         account.users = encoded
-        return payload.kind == 'addMember' and 'Account access granted.' or 'Account access removed.'
+        return payload.kind == 'addMember' and Kora.lang('success.access_granted') or Kora.lang('success.access_removed')
     end
-    return nil, 'Unknown account action.'
+    return nil, Kora.lang('error.unknown_action')
 end
 
 local function openBanking(src, mode, location)
-    if not ready then return nil, 'Banking is still starting.' end
+    if not ready then return nil, Kora.lang('error.starting') end
     mode = mode == 'atm' and 'atm' or 'bank'
     if mode == 'atm' then
-        if atmCardMissing(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
-        if not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
+        if atmCardMissing(src) then return nil, Config.atmNoCardMessage or Kora.lang('error.need_card') end
+        if not nearAtm(src, location) then return nil, Kora.lang('error.near_atm') end
         local unlocked = Config.requireBankCard == false
         session(src, mode, unlocked, location)
         return snapshot(src, mode, unlocked)
     end
-    if not branchAt(src, location) then return nil, 'Move closer to a bank counter.' end
+    if not branchAt(src, location) then return nil, Kora.lang('error.near_counter') end
     session(src, mode, true, location)
     return snapshot(src, mode, true, branchAt(src, location))
 end
@@ -691,14 +691,14 @@ local function openCallback(src, mode, location)
     local ok, result, err = pcall(openBanking, src, mode, location)
     if ok then return result, err end
     print(('^1[kora_banking]^7 open failed for %s: %s'):format(src, tostring(result)))
-    return nil, 'The bank encountered an internal error.'
+    return nil, Kora.lang('error.internal')
 end
 
 -- Quick pre-check so the client can refuse before the animation and progress bar; openBanking stays the authority.
 -- location is optional: the target visibility check asks for the card only, without a position.
 local function atmCardCallback(src, location)
-    if atmCardMissing(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
-    if location ~= nil and not nearAtm(src, location) then return nil, 'Move closer to an ATM.' end
+    if atmCardMissing(src) then return nil, Config.atmNoCardMessage or Kora.lang('error.need_card') end
+    if location ~= nil and not nearAtm(src, location) then return nil, Kora.lang('error.near_atm') end
     return true
 end
 
@@ -709,20 +709,20 @@ local PinGuards = {}
 
 local function pinCallback(src, pin)
     local current = activeSession(src)
-    if not current or current.mode ~= 'atm' then return nil, 'Open an ATM first.' end
+    if not current or current.mode ~= 'atm' then return nil, Kora.lang('error.atm_first') end
     local guard = PinGuards[src]
     if not guard then guard = { attempts = 0 } PinGuards[src] = guard end
-    if guard.lockedUntil and guard.lockedUntil > os.time() then return nil, 'Too many attempts. Wait a moment and try again.' end
-    if not hasBankCard(src) then return nil, Config.atmNoCardMessage or 'You need a bank card to use an ATM.' end
+    if guard.lockedUntil and guard.lockedUntil > os.time() then return nil, Kora.lang('error.attempt_wait') end
+    if not hasBankCard(src) then return nil, Config.atmNoCardMessage or Kora.lang('error.need_card') end
     local value = tostring(pin or '')
     if not value:match('^%d%d%d%d$') or not cardPins(src)[value] then
         guard.attempts = guard.attempts + 1
         if guard.attempts >= 5 then
             guard.attempts = 0
             guard.lockedUntil = os.time() + 30
-            return nil, 'Too many attempts. Wait 30 seconds and try again.'
+            return nil, Kora.lang('error.attempt_wait_seconds')
         end
-        return nil, 'Incorrect PIN.'
+        return nil, Kora.lang('error.incorrect_pin')
     end
     PinGuards[src] = nil
     current.unlocked = true
@@ -734,32 +734,32 @@ local function runAction(src, current, data, payload)
     if payload.kind == 'deposit' or payload.kind == 'withdraw' then
         message, actionErr = transactCash(src, data, current, payload)
     elseif payload.kind == 'transfer' then
-        if current.mode == 'atm' then return nil, 'Transfers are available inside a bank.' end
+        if current.mode == 'atm' then return nil, Kora.lang('error.transfer_in_bank') end
         message, actionErr = transfer(src, data, payload, current.branch)
     elseif current.mode == 'bank' then
         message, actionErr = manage(src, data, payload, current.branch)
     else
-        return nil, 'That action is not available at an ATM.'
+        return nil, Kora.lang('error.atm_action')
     end
     if not message then return nil, actionErr end
     return { message = message, snapshot = snapshot(src, current.mode, true, current.branch) }
 end
 
 local function actionCallback(src, payload)
-    if type(payload) ~= 'table' then return nil, 'Invalid request.' end
+    if type(payload) ~= 'table' then return nil, Kora.lang('error.request_invalid') end
     local current = activeSession(src)
-    if not current or not current.unlocked then return nil, 'Your banking session expired.' end
+    if not current or not current.unlocked then return nil, Kora.lang('error.session_expired') end
     local data, err = player(src)
     if not data then return nil, err end
     -- Tier limit checks read the database before debiting; serialise a player's actions so two overlapping
     -- requests cannot both pass the same daily cap.
-    if current.busy then return nil, 'Your previous banking request is still being processed.' end
+    if current.busy then return nil, Kora.lang('error.request_pending') end
     current.busy = true
     local ok, result, resultErr = pcall(runAction, src, current, data, payload)
     current.busy = nil
     if not ok then
         print(('^1[kora_banking]^7 action failed for %s: %s'):format(src, tostring(result)))
-        return nil, 'The bank encountered an internal error.'
+        return nil, Kora.lang('error.internal')
     end
     return result, resultErr
 end
@@ -784,13 +784,13 @@ RegisterNetEvent('kora_banking:server:request', function(requestId, operation, .
         or operation == 'pin' and pinCallback
         or operation == 'action' and actionCallback
     if not handler then
-        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, 'Invalid banking request.')
+        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, Kora.lang('error.invalid_request'))
     end
 
     local ok, result, err = pcall(handler, src, ...)
     if not ok then
         print(('^1[kora_banking]^7 %s request failed for %s: %s'):format(operation, src, tostring(result)))
-        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, 'The bank encountered an internal error.')
+        return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, Kora.lang('error.internal'))
     end
     TriggerClientEvent('kora_banking:client:response', src, requestId, result, err)
 end)
@@ -829,13 +829,13 @@ bankingExport('CreateBankStatement', createBankStatement)
 local function addMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, amount) then return false end
-    statement(0, name, amount, reason or 'External deposit', 'deposit')
+    statement(0, name, amount, reason or Kora.lang('ui.external_deposit'), 'deposit')
     return true
 end
 local function removeMoney(name, amount, reason)
     amount = roundAmount(amount)
     if not amount or not adjustAccount(name, -amount) then return false end
-    statement(0, name, amount, reason or 'External withdrawal', 'withdraw')
+    statement(0, name, amount, reason or Kora.lang('ui.external_withdrawal'), 'withdraw')
     return true
 end
 bankingExport('AddMoney', addMoney)
@@ -854,18 +854,18 @@ exports.kora_core:addCommand('givecash', 'Give nearby player cash', {
     { name = 'id', help = 'Player ID' }, { name = 'amount', help = 'Amount' },
 }, true, function(src, args)
     local target, amount = tonumber(args[1]), roundAmount(args[2])
-    if not target or not amount then return Kora.notify.send(src, { title = 'Banking', message = 'Enter a valid player and amount.', type = 'error' }) end
+    if not target or not amount then return Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('error.valid_player_amount'), type = 'error' }) end
     local from, to = player(src), exports.kora_core:getPlayerData(target)
-    if not from or not to then return Kora.notify.send(src, { title = 'Banking', message = 'Player not found.', type = 'error' }) end
+    if not from or not to then return Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('error.player_not_found'), type = 'error' }) end
     local a, b = GetEntityCoords(GetPlayerPed(src)), GetEntityCoords(GetPlayerPed(target))
-    if #(a - b) > 5.0 then return Kora.notify.send(src, { title = 'Banking', message = 'That player is too far away.', type = 'error' }) end
-    if not exports.kora_core:removeMoney(src, 'cash', amount, 'cash transfer', true) then return Kora.notify.send(src, { title = 'Banking', message = 'You do not have enough cash.', type = 'error' }) end
+    if #(a - b) > 5.0 then return Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('error.player_too_far'), type = 'error' }) end
+    if not exports.kora_core:removeMoney(src, 'cash', amount, 'cash transfer', true) then return Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('error.cash_insufficient'), type = 'error' }) end
     if not exports.kora_core:addMoney(target, 'cash', amount, 'cash transfer', true) then
         exports.kora_core:addMoney(src, 'cash', amount, 'cash transfer rollback', true)
-        return Kora.notify.send(src, { title = 'Banking', message = 'The transfer failed.', type = 'error' })
+        return Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('error.transfer_failed'), type = 'error' })
     end
-    Kora.notify.send(src, { title = 'Banking', message = ('Gave $%d.'):format(amount), type = 'success' })
-    Kora.notify.send(target, { title = 'Banking', message = ('Received $%d.'):format(amount), type = 'success' })
+    Kora.notify.send(src, { title = Kora.lang('title'), message = Kora.lang('success.gave_cash', amount), type = 'success' })
+    Kora.notify.send(target, { title = Kora.lang('title'), message = Kora.lang('success.received_cash', amount), type = 'success' })
 end)
 
 RegisterNetEvent('kora_banking:close', function() Sessions[source] = nil end)

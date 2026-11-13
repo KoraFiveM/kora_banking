@@ -38,10 +38,10 @@ local function playerValues(ids)
     if not rows then return nil, err end
     for _, row in ipairs(rows) do
         local money = decode(row.money)
-        if not money then return nil, 'Stored money is invalid.' end
+        if not money then return nil, Kora.lang('finance.money_invalid') end
         result[row.citizenid] = { money = money }
     end
-    for _, cid in ipairs(ids) do if not result[cid] then return nil, 'A character no longer exists.' end end
+    for _, cid in ipairs(ids) do if not result[cid] then return nil, Kora.lang('finance.character_missing') end end
     return result
 end
 
@@ -68,33 +68,33 @@ local function receipt(resource, key, expectedRequest)
     -- A locking read also waits for a receipt INSERT left at the database by
     -- a restarted SQL host, whose in-memory worker registry no longer exists.
     local read, err = Kora.sql.transactionChecked({ { query = 'SELECT `request`,`receipt` FROM `bank_operations` WHERE `resource`=? AND `operation_key`=? FOR UPDATE', values = { resource, key } } })
-    if not read or not read.success or not read.results or type(read.results[1]) ~= 'table' then return nil, 'unavailable', err or 'Banking receipt lookup could not be confirmed.' end
+    if not read or not read.success or not read.results or type(read.results[1]) ~= 'table' then return nil, 'unavailable', err or Kora.lang('finance.receipt_unconfirmed') end
     local row = read.results[1][1]
     if not row then return nil, 'not_found' end
-    if expectedRequest and row.request ~= expectedRequest then return nil, 'conflict', 'Operation key has different transaction terms.' end
+    if expectedRequest and row.request ~= expectedRequest then return nil, 'conflict', Kora.lang('finance.receipt_terms') end
     local value = decode(row.receipt)
-    if not value then return nil, 'unavailable', 'Stored banking receipt is invalid.' end
+    if not value then return nil, 'unavailable', Kora.lang('finance.receipt_invalid') end
     local synced, syncErr = synchronize(resource, key)
-    if not synced then return nil, 'pending', syncErr or 'Committed funds are awaiting player synchronization.' end
+    if not synced then return nil, 'pending', syncErr or Kora.lang('finance.sync_pending') end
     for _, account in ipairs(value.accounts or {}) do TriggerEvent('kora_banking:refreshAccount', account) end
     return value
 end
 
 local function prepare(request)
-    if type(request) ~= 'table' then return nil, 'Invalid financial request.' end
+    if type(request) ~= 'table' then return nil, Kora.lang('finance.request_invalid') end
     local accounts, ids, seen, legs = {}, {}, {}, {}
     local totals = { debits = 0, credits = 0 }
     for _, direction in ipairs({ 'debits', 'credits' }) do
         local entries = request[direction] or {}
-        if type(entries) ~= 'table' or #entries > 128 then return nil, 'Invalid transaction legs.' end
+        if type(entries) ~= 'table' or #entries > 128 then return nil, Kora.lang('finance.legs_invalid') end
         for _, entry in ipairs(entries) do
-            if type(entry) ~= 'table' then return nil, 'Invalid transaction leg.' end
+            if type(entry) ~= 'table' then return nil, Kora.lang('finance.leg_invalid') end
             local amount = entry.amount
-            if type(amount) ~= 'number' or amount % 1 ~= 0 or amount < 1 or amount > 1000000000 then return nil, 'Amounts must be positive whole currency units.' end
+            if type(amount) ~= 'number' or amount % 1 ~= 0 or amount < 1 or amount > 1000000000 then return nil, Kora.lang('finance.amount_invalid') end
             local cid, account = entry.citizenid, entry.account
-            if (cid == nil) == (account == nil) then return nil, 'Choose one character or named account per leg.' end
+            if (cid == nil) == (account == nil) then return nil, Kora.lang('finance.leg_target') end
             local name = cid or account
-            if type(name) ~= 'string' or #name < 1 or #name > 50 then return nil, 'Invalid financial account.' end
+            if type(name) ~= 'string' or #name < 1 or #name > 50 then return nil, Kora.lang('finance.account_invalid') end
             local identity = (cid and 'character:' or 'account:') .. name
             accounts[identity] = accounts[identity] or { citizenid = cid, account = account, debits = 0, credits = 0 }
             accounts[identity][direction] = accounts[identity][direction] + amount
@@ -103,10 +103,10 @@ local function prepare(request)
             if cid and not seen[cid] then ids[#ids + 1], seen[cid] = cid, true end
         end
     end
-    if totals.debits < 1 or totals.debits ~= totals.credits then return nil, 'Financial legs must balance.' end
-    if request.statements ~= nil and (type(request.statements) ~= 'table' or #request.statements > 256) then return nil, 'Invalid domain transaction.' end
+    if totals.debits < 1 or totals.debits ~= totals.credits then return nil, Kora.lang('finance.legs_unbalanced') end
+    if request.statements ~= nil and (type(request.statements) ~= 'table' or #request.statements > 256) then return nil, Kora.lang('finance.domain_invalid') end
     for _, statement in ipairs(request.statements or {}) do
-        if type(statement) ~= 'table' or type(statement.query) ~= 'string' or #statement.query > 20000 then return nil, 'Invalid domain statement.' end
+        if type(statement) ~= 'table' or type(statement.query) ~= 'string' or #statement.query > 20000 then return nil, Kora.lang('finance.statement_invalid') end
     end
     table.sort(ids)
     return { accounts = accounts, ids = ids, legs = legs, amount = totals.debits }
@@ -186,30 +186,30 @@ end
 
 local function executeTransaction(key, request)
     local resource = caller()
-    if not resource then return nil, 'rejected', 'This resource cannot execute durable banking operations.' end
-    if not ready then return nil, 'unavailable', 'Durable banking is not ready.' end
-    if type(key) ~= 'string' or #key < 1 or #key > 128 then return nil, 'rejected', 'Invalid operation key.' end
+    if not resource then return nil, 'rejected', Kora.lang('finance.resource_execute') end
+    if not ready then return nil, 'unavailable', Kora.lang('finance.not_ready') end
+    if type(key) ~= 'string' or #key < 1 or #key > 128 then return nil, 'rejected', Kora.lang('finance.operation_key') end
     local encoded, fingerprint = pcall(canonical, request, 0)
-    if not encoded or #fingerprint > 524288 then return nil, 'rejected', 'Invalid or oversized financial request.' end
+    if not encoded or #fingerprint > 524288 then return nil, 'rejected', Kora.lang('finance.request_oversized') end
     local identity = operationId(resource, key)
-    if busy[identity] then return nil, 'pending', 'This banking operation is pending.' end
+    if busy[identity] then return nil, 'pending', Kora.lang('finance.operation_pending') end
     busy[identity] = true
     local result = table.pack(pcall(execute, resource, key, request, fingerprint))
     busy[identity] = nil
     if not result[1] then
         print(('[kora_banking] durable operation failed for %s: %s'):format(resource, tostring(result[2])))
-        return nil, 'indeterminate', 'The transaction needs receipt reconciliation.'
+        return nil, 'indeterminate', Kora.lang('finance.reconcile')
     end
     return table.unpack(result, 2, result.n)
 end
 
 local function getOperation(key)
     local resource = caller()
-    if not resource then return nil, 'rejected', 'This resource cannot read banking operations.' end
-    if not ready then return nil, 'unavailable', 'Durable banking is not ready.' end
-    if type(key) ~= 'string' or #key < 1 or #key > 128 then return nil, 'rejected', 'Invalid operation key.' end
+    if not resource then return nil, 'rejected', Kora.lang('finance.resource_read') end
+    if not ready then return nil, 'unavailable', Kora.lang('finance.not_ready') end
+    if type(key) ~= 'string' or #key < 1 or #key > 128 then return nil, 'rejected', Kora.lang('finance.operation_key') end
     local result = table.pack(pcall(receipt, resource, key))
-    if not result[1] then return nil, 'unavailable', 'Banking receipt lookup failed.' end
+    if not result[1] then return nil, 'unavailable', Kora.lang('finance.receipt_lookup') end
     return table.unpack(result, 2, result.n)
 end
 

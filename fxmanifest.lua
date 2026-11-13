@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'kora_banking'
-author 'qbcore2'
+author 'Kora'
 version '0.2.1'
 description 'Personal, shared, society and gang banking for Kora'
 
@@ -22,16 +22,20 @@ dependency 'kora_inventory'
 shared_scripts {
     '@kora_lib/init.lua',
     '@kora_core/init.lua',
-    'config.lua',
-    'dates.lua',
-    'tiers.lua',
+    'shared/config.lua',
+    'shared/dates.lua',
+    'shared/tiers.lua',
 }
 
 client_scripts {
-    'client.lua',
+    'client/client.lua',
 }
 
-server_scripts { '@kora_sql/init.lua', 'server/schema.lua', 'server.lua', 'server/finance.lua' }
+server_scripts { '@kora_sql/init.lua', 'server/schema.lua', 'server/server.lua', 'server/finance.lua' }
+
+files {
+    'locales/*.lua',
+}
 
 -- kora_qa: Gherkin test scenarios (converted legacy tests), see [kora]/kora_qa/README.md
 qa_feature 'tests/*.feature'
