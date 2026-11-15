@@ -47,7 +47,14 @@ local function boot(opts)
     for key, value in pairs(_G) do env[key] = value end
     env.KoraBankingSchema = { { name = 'bank_operation_legs' } }
     env.Kora, env.Kora, env.Config = api, api, { transactionCallers = {}, migrationRetrySeconds = opts.retry }
-    env.print = function(text) printed[#printed + 1] = text end
+    api.logging = { isEnabled = function() return true end }
+    for _, level in ipairs({ 'trace', 'debug', 'info', 'warn', 'error', 'fatal' }) do
+        api.logging[level] = function(event, message, fields)
+            printed[#printed + 1] = message
+            printed.last = { level = level, event = event, message = message, fields = fields }
+            return true
+        end
+    end
     env.exports = setmetatable({ kora_core = {} }, { __call = function() end })
     env.GetInvokingResource = function() return 'kora_housing' end
     env.GetCurrentResourceName = function() return 'kora_banking' end
@@ -66,6 +73,7 @@ check(calls.ready, 'durable banking enables once the schema is applied')
 local timers
 calls, printed, timers = boot({ migrateError = 'boom' })
 check(not calls.ready and printed[1]:find('stay disabled', 1, true) and #timers.delays == 0, 'schema failure is logged clearly; no retry by default')
+check(printed.last.level == 'error' and printed.last.event == 'schema.durable_setup_failed' and printed.last.fields.error == 'boom', 'schema failure is logged at error level with the cause in fields')
 calls, printed, timers = boot({ migrateError = 'boom', retry = 120 })
 check(not calls.ready and timers.delays[1] == 120000, 'migrationRetrySeconds schedules a retry')
 print(('kora_banking migrations: %d assertions passed; Lua schema, no conversions at boot, failure handling'):format(assertions))

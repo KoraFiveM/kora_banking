@@ -197,7 +197,7 @@ local function executeTransaction(key, request)
     local result = table.pack(pcall(execute, resource, key, request, fingerprint))
     busy[identity] = nil
     if not result[1] then
-        print(('[kora_banking] durable operation failed for %s: %s'):format(resource, tostring(result[2])))
+        Kora.logging.error('finance.durable_operation_failed', 'Durable operation failed', { resource = tostring(resource), error = tostring(result[2]) })
         return nil, 'indeterminate', Kora.lang('finance.reconcile')
     end
     return table.unpack(result, 2, result.n)
@@ -249,14 +249,14 @@ local function bootstrap()
     if not available then Kora.timers.setTimeout(bootstrap, 30000); return end
     local migrated, err = Kora.sql.ensureTables(KoraBankingSchema)
     if not migrated then
-        print(('[kora_banking] durable banking schema setup failed: %s. Durable transactions and durable history stay disabled until it succeeds.'):format(tostring(err)))
+        Kora.logging.error('schema.durable_setup_failed', 'Durable banking schema setup failed; durable transactions and durable history stay disabled until it succeeds', { error = tostring(err) })
         local retry = tonumber(Config.migrationRetrySeconds) or 0
         if retry > 0 then Kora.timers.setTimeout(bootstrap, retry * 1000) end
         return
     end
     local settled, waitErr = Kora.sql.awaitCheckedOperations('kora_core:fence:kora_banking:')
     if not settled then
-        print(('[kora_banking] player operation recovery deferred: %s'):format(tostring(waitErr)))
+        Kora.logging.warn('finance.recovery_deferred', 'Player operation recovery deferred', { error = tostring(waitErr) })
         Kora.timers.setTimeout(bootstrap, 30000)
         return
     end
