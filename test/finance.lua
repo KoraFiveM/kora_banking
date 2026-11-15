@@ -1,4 +1,5 @@
 -- Real provider code against a transactional, rollback-capable SQL fixture.
+local spy = dofile('test/logging_spy.lua')
 local tools = dofile('../kora_core/test/mocks.lua')
 local json = { encode = tools.stableEncode, decode = tools.simpleDecode }
 local function copy(value) return json.decode(json.encode(value)) end
@@ -38,6 +39,7 @@ local function boot()
         return copy(database.receipts[params[1] .. ':' .. params[2]])
     end
     function sql.query(_, ids)
+        if f.explode then error('kaboom') end
         if f.outage then return nil, 'controlled database outage' end
         local rows = {}
         for _, cid in ipairs(ids) do
@@ -82,7 +84,7 @@ local function boot()
     end
     local env = {}
     for key, value in pairs(_G) do env[key] = value end
-    env.json, env.Config, env.Kora = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, util = { decodeJson = function(v) local ok, r = pcall(json.decode, v) return ok and r or nil end }, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
+    env.json, env.Config, env.Kora = json, { transactionCallers = { kora_housing = true, other = true } }, { sql = sql, logging = spy.logging, lang = function(key) return key end, util = { decodeJson = function(v) local ok, r = pcall(json.decode, v) return ok and r or nil end }, timers = { setTimeout = function(fn) threads[#threads + 1] = fn; return #threads end, clearTimeout = function() end } }
     env.exports = setmetatable({ kora_core = core }, { __call = function(_, name, fn) api[name] = fn end })
     env.GetInvokingResource = function() return caller end
     env.GetCurrentResourceName = function() return 'kora_banking' end
@@ -162,4 +164,13 @@ check(api.ExecuteTransaction('credit:negative-recipient', income) and database.p
 f.outage = true
 receipt, code = api.ExecuteTransaction('rent:outage', reserve)
 check(not receipt and code == 'unavailable', 'An outage cannot be classified as insufficient funds')
+f.outage = false
+f.explode = true
+spy.calls = {}
+receipt, code = api.ExecuteTransaction('rent:explode', reserve)
+local failed = spy.find('finance.durable_operation_failed')
+check(not receipt and code == 'indeterminate', 'An unexpected error in a durable operation is reported as indeterminate')
+check(failed and failed.level == 'error' and type(failed.fields) == 'table' and tostring(failed.fields.error):find('kaboom', 1, true), 'The failure is logged at error level with the cause in fields')
+check(not failed.message:find('%[') and failed.fields.resource == 'kora_housing', 'Message has no resource prefix; the calling resource is a field')
+f.explode = false
 print(('kora_banking durable finance: %d assertions passed; atomic commit, rollback, escrow, receipt/restart recovery'):format(assertions))

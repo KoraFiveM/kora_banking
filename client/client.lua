@@ -689,7 +689,7 @@ local function accessAtm(target, fixed)
         openingAtm = false
         stopAtmAnimation()
         if not ok then
-            print(('[kora_banking] ATM progress bar failed: %s'):format(tostring(completed)))
+            Kora.logging.error('atm.progress_bar_failed', 'ATM progress bar failed', { error = tostring(completed) })
             return notify(Kora.lang('error.atm_start_failed'))
         end
         if not completed then
@@ -769,7 +769,7 @@ local function registerAtmZones()
                 },
             })
         end)
-        if ok then atmZoneIds[index] = result else print(('[kora_banking] ATM zone %d registration failed: %s'):format(index, tostring(result))) end
+        if ok then atmZoneIds[index] = result else Kora.logging.error('atm.zone_registration_failed', 'ATM zone registration failed', { index = index, error = tostring(result) }) end
     end
 end
 
@@ -784,7 +784,7 @@ local function registerAtmTargets()
             { icon = 'credit-card', label = Kora.lang('ui.use_atm'), onSelect = accessAtm, canInteract = showAtmOption },
         }, Config.atmDistance)
     end)
-    if ok then atmTargetId = result else print(('[kora_banking] ATM target registration failed: %s'):format(tostring(result))) end
+    if ok then atmTargetId = result else Kora.logging.error('atm.target_registration_failed', 'ATM target registration failed', { error = tostring(result) }) end
 end
 
 -- ATMs register first and each registration is isolated: a failing bank-branch zone must never stop ATMs from registering.
@@ -794,7 +794,7 @@ local targetsRegistered = false
 local function registerTargets()
     registerAtmTargets()
     local ok, err = pcall(registerBranchTargets)
-    if not ok then print(('[kora_banking] bank branch target registration failed: %s'):format(tostring(err))) end
+    if not ok then Kora.logging.error('branch.target_registration_failed', 'Bank branch target registration failed', { error = tostring(err) }) end
     targetsRegistered = ok and atmTargetId ~= nil
 end
 

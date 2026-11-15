@@ -16,7 +16,7 @@ if not Kora.shared.get('items', 'bank_card') then
         description = Kora.lang('ui.bank_card_description'),
     })
     if not itemRegistered then
-        print(('^1[kora_banking]^7 bank card registration failed: %s'):format(itemError or 'unknown error'))
+        Kora.logging.error('item.bank_card_registration_failed', 'Bank card item registration failed', { error = tostring(itemError or 'unknown error') })
     end
 end
 
@@ -690,7 +690,7 @@ end
 local function openCallback(src, mode, location)
     local ok, result, err = pcall(openBanking, src, mode, location)
     if ok then return result, err end
-    print(('^1[kora_banking]^7 open failed for %s: %s'):format(src, tostring(result)))
+    Kora.logging.error('banking.open_failed', 'Opening banking failed', { playerId = src, error = tostring(result) })
     return nil, Kora.lang('error.internal')
 end
 
@@ -758,7 +758,7 @@ local function actionCallback(src, payload)
     local ok, result, resultErr = pcall(runAction, src, current, data, payload)
     current.busy = nil
     if not ok then
-        print(('^1[kora_banking]^7 action failed for %s: %s'):format(src, tostring(result)))
+        Kora.logging.error('banking.action_failed', 'Banking action failed', { playerId = src, error = tostring(result) })
         return nil, Kora.lang('error.internal')
     end
     return result, resultErr
@@ -789,7 +789,7 @@ RegisterNetEvent('kora_banking:server:request', function(requestId, operation, .
 
     local ok, result, err = pcall(handler, src, ...)
     if not ok then
-        print(('^1[kora_banking]^7 %s request failed for %s: %s'):format(operation, src, tostring(result)))
+        Kora.logging.error('banking.request_failed', 'Banking request failed', { operation = tostring(operation), playerId = src, error = tostring(result) })
         return TriggerClientEvent('kora_banking:client:response', src, requestId, nil, Kora.lang('error.internal'))
     end
     TriggerClientEvent('kora_banking:client:response', src, requestId, result, err)
@@ -877,18 +877,18 @@ end)
 CreateThread(function()
     local available, readyErr = Kora.sql.ready(60000)
     if not available then
-        print(('^1[kora_banking]^7 database unavailable: %s'):format(readyErr or 'unknown error'))
+        Kora.logging.error('schema.database_unavailable', 'Database unavailable', { error = tostring(readyErr or 'unknown error') })
         return
     end
     -- Idempotent; guarantees bank_accounts/bank_statements exist before the first read (finance.lua ensures the same schema).
     local ensured, ensureErr = Kora.sql.ensureTables(KoraBankingSchema)
     if not ensured then
-        print(('^1[kora_banking]^7 schema setup failed: %s'):format(ensureErr or 'unknown error'))
+        Kora.logging.error('schema.setup_failed', 'Schema setup failed', { error = tostring(ensureErr or 'unknown error') })
         return
     end
     local rows, loadErr = Kora.sql.query('SELECT * FROM bank_accounts')
     if not rows then
-        print(('^1[kora_banking]^7 account load failed: %s'):format(loadErr or 'unknown error'))
+        Kora.logging.error('accounts.load_failed', 'Account load failed', { error = tostring(loadErr or 'unknown error') })
         return
     end
     for _, account in ipairs(rows) do Accounts[account.account_name] = account end
@@ -899,7 +899,7 @@ CreateThread(function()
         local name = definition.name
         if name ~= 'unemployed' and not Accounts[name] then
             if not createJobAccount(name, 0) then
-                print(('^1[kora_banking]^7 job account creation failed for %s'):format(name))
+                Kora.logging.error('accounts.job_create_failed', 'Job account creation failed', { job = tostring(name) })
                 return
             end
         end
@@ -909,7 +909,7 @@ CreateThread(function()
         local name = definition.name
         if name ~= 'none' and not Accounts[name] then
             if not createGangAccount(name, 0) then
-                print(('^1[kora_banking]^7 gang account creation failed for %s'):format(name))
+                Kora.logging.error('accounts.gang_create_failed', 'Gang account creation failed', { gang = tostring(name) })
                 return
             end
         end
