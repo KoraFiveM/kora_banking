@@ -9,7 +9,7 @@ sidebar_position: 6
 
 ## Authorization
 
-Only resources listed in `Config.transactionCallers` with the value `true` may call these exports (default `{ kora_housing = true }`). The caller is detected with `GetInvokingResource()`. Any other caller gets `false, 'rejected', ...`. Both exports yield, so call them from a thread.
+Only resources listed in `Config.transactionCallers` with the value `true` may call these exports (default `{ kora_housing = true, kora_phone = true }`; the phone uses it for player-to-player transfers). The caller is detected with `GetInvokingResource()`. Any other caller gets `false, 'rejected', ...`. Both exports yield, so call them from a thread.
 
 ## ExecuteTransaction
 
