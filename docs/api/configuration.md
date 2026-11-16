@@ -16,7 +16,7 @@ Every key of `Config` in `config.lua`. Anything under `tiers.list` is open-ended
 
 | Key | Type | Default | Controls | Applies |
 | --- | --- | --- | --- | --- |
-| transactionCallers | table&lt;string, true> | &#123; kora_housing = true &#125; | Resources allowed to call `ExecuteTransaction` and `GetOperation`. Read at call time. |  |
+| transactionCallers | table&lt;string, true> | &#123; kora_housing = true, kora_phone = true &#125; | Resources allowed to call `ExecuteTransaction` and `GetOperation`. Read at call time. |  |
 | ui.accent | string \| nil | nil | Accent colour passed to the AppShell definition when it is a string. | Not registered with kora_lib's config editor. |
 | atmModels | string[] | prop_atm_01, prop_atm_02, prop_atm_03, prop_fleeca_atm, gabz_sm_pb_atmframe, v_5_b_atm1, v_5_b_atm2 | Model names targeted as ATMs and searched for nearby (client). | Restart. |
 | atmCoords | vector3[] | two Fleeca ATMs at Legion Square | Fallback `Use ATM` sphere zones for map-baked ATMs. | Restart. |
@@ -66,7 +66,7 @@ Pass an options table as the final argument to a play function. Omit the table o
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `transactionCallers` | table&lt;string, true> | Default &#123; kora_housing = true &#125;. Resources allowed to call `ExecuteTransaction` and `GetOperation`. Read at call time. |
+| `transactionCallers` | table&lt;string, true> | Default &#123; kora_housing = true, kora_phone = true &#125;. Resources allowed to call `ExecuteTransaction` and `GetOperation`. Read at call time. |
 | `ui.accent` | string \| nil | Default nil. Accent colour passed to the AppShell definition when it is a string. Applies: Not registered with kora_lib's config editor. |
 | `atmModels` | string[] | Default prop_atm_01, prop_atm_02, prop_atm_03, prop_fleeca_atm, gabz_sm_pb_atmframe, v_5_b_atm1, v_5_b_atm2. Model names targeted as ATMs and searched for nearby (client). Applies: Restart. |
 | `atmCoords` | vector3[] | Default two Fleeca ATMs at Legion Square. Fallback `Use ATM` sphere zones for map-baked ATMs. Applies: Restart. |
