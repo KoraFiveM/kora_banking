@@ -109,6 +109,11 @@ return {
         personal_banking = 'Personal banking', transaction_footer = 'Every transaction is verified by the banking server.',
         open_branch = 'Open %s', open_bank = 'Open bank', use_atm = 'Use ATM',
         another_branch = 'another branch',
+        this_bank = 'this bank',
+        feature_deposit = 'Depositing cash', feature_withdraw = 'Withdrawing cash', feature_transfer = 'Transferring money',
+        feature_order_card = 'Ordering a bank card', feature_create_shared = 'Opening a shared account',
+        feature_rename_shared = 'Renaming a shared account', feature_close_shared = 'Closing a shared account',
+        feature_manage_members = 'Managing account members',
     },
     progress = { atm = 'Accessing ATM...' },
     finance = {

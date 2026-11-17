@@ -304,9 +304,10 @@ local function branchAt(src, index)
 end
 
 -- Returns an error message when the branch's tier blocks the feature (always nil while tiers are disabled).
-local function tierBlocks(branch, feature, what)
+-- labelKey is the locale key of the blocked action's label (ui.feature_*).
+local function tierBlocks(branch, feature, labelKey)
     if BankingTiers.can(branch, feature) then return nil end
-    return Kora.lang('error.feature_available', what, BankingTiers.availableAt(feature) or Kora.lang('ui.another_branch'))
+    return Kora.lang('error.feature_available', Kora.lang(labelKey), BankingTiers.availableAt(feature) or Kora.lang('ui.another_branch'))
 end
 
 local function nearAtm(src, location)
@@ -405,8 +406,8 @@ local function transactCash(src, data, current, payload)
     local reason = cleanText(payload.reason, payload.kind == 'deposit' and Kora.lang('ui.cash_deposit') or Kora.lang('ui.cash_withdrawal'), 50)
     local tooSmall = belowMinimum(payload.kind == 'deposit' and 'deposit' or 'withdraw', amount)
     if tooSmall then return nil, tooSmall end
-    local blocked = payload.kind == 'deposit' and tierBlocks(current.branch, 'deposit', 'Depositing cash')
-        or payload.kind ~= 'deposit' and tierBlocks(current.branch, 'withdraw', 'Withdrawing cash') or nil
+    local blocked = payload.kind == 'deposit' and tierBlocks(current.branch, 'deposit', 'ui.feature_deposit')
+        or payload.kind ~= 'deposit' and tierBlocks(current.branch, 'withdraw', 'ui.feature_withdraw') or nil
     if blocked then return nil, blocked end
 
     if payload.kind == 'deposit' then
@@ -425,7 +426,7 @@ local function transactCash(src, data, current, payload)
     end
     local counterCap = current.mode == 'bank' and BankingTiers.limit(current.branch, 'dailyWithdraw') or nil
     if counterCap and amount > dailyWithdrawalRemaining(data, counterCap) then
-        return nil, Kora.lang('error.daily_limit', counterCap, current.branch.label or 'this bank')
+        return nil, Kora.lang('error.daily_limit', counterCap, current.branch.label or Kora.lang('ui.this_bank'))
     end
     if not debit(src, data, account, amount, reason) then return nil, Kora.lang('error.insufficient_account') end
     if not exports.kora_core:addMoney(src, 'cash', amount, reason, true) then
@@ -513,7 +514,7 @@ local function transfer(src, data, payload, branch)
     local reason = cleanText(payload.reason, 'Bank transfer', 50)
     local tooSmall = belowMinimum('transfer', amount)
     if tooSmall then return nil, tooSmall end
-    local blocked = tierBlocks(branch, 'transfer', 'Transferring money')
+    local blocked = tierBlocks(branch, 'transfer', 'ui.feature_transfer')
     if blocked then return nil, blocked end
     local maxTransfer = BankingTiers.limit(branch, 'maxTransfer')
     if maxTransfer and amount > maxTransfer then
@@ -574,12 +575,12 @@ local function transfer(src, data, payload, branch)
 end
 
 local MANAGE_FEATURES = {
-    orderCard = { 'orderCard', 'Ordering a bank card' },
-    create = { 'sharedAccounts', 'Opening a shared account' },
-    rename = { 'sharedAccounts', 'Renaming a shared account' },
-    delete = { 'sharedAccounts', 'Closing a shared account' },
-    addMember = { 'manageMembers', 'Managing account members' },
-    removeMember = { 'manageMembers', 'Managing account members' },
+    orderCard = { 'orderCard', 'ui.feature_order_card' },
+    create = { 'sharedAccounts', 'ui.feature_create_shared' },
+    rename = { 'sharedAccounts', 'ui.feature_rename_shared' },
+    delete = { 'sharedAccounts', 'ui.feature_close_shared' },
+    addMember = { 'manageMembers', 'ui.feature_manage_members' },
+    removeMember = { 'manageMembers', 'ui.feature_manage_members' },
 }
 
 local function manage(src, data, payload, branch)
