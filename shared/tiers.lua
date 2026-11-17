@@ -126,7 +126,7 @@ function BankingTiers.gated(info)
     local result = {}
     if not info or not info.enabled then return result end
     for _, feature in ipairs(BankingTiers.FEATURES) do
-        if not BankingTiers.can(info, feature) then result[feature] = BankingTiers.availableAt(feature) or 'another branch' end
+        if not BankingTiers.can(info, feature) then result[feature] = BankingTiers.availableAt(feature) or Kora.lang('ui.another_branch') end
     end
     return result
 end
