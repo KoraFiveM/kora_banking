@@ -6,6 +6,7 @@
       "client.lua"
     ],
     "server": [
+      "kora_versioncheck.lua",
       "server.lua",
       "server/finance.lua",
       "server/schema.lua"
